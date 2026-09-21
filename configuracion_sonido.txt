@@ -1,0 +1,9 @@
+{
+ "audio":{
+	"musica_volumen": 1.0,
+        "sfx_volumen":1.0,
+	"musica_muted":false,
+	"sfx_muted":false	
+
+ }
+}
