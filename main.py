@@ -1,49 +1,72 @@
 import pygame
 import sys
+from Clases.Configuracion import Configuracion
+from Controlador.MenuControlador import MenuControlador
+from Controlador.AjusteControlador import AjusteControlador
+# from Controlador.JuegoControlador import JuegoControlador
 
-# Inicializar Pygame
-pygame.init()
+def main():
+    pygame.init()
+    pygame.mixer.init() #
+    pantalla = pygame.display.set_mode((640, 480))
+    pygame.display.set_caption("Memotest Pixel Art")
 
-# 1. Configuración de pantallas (Resolución retro y escala)
-INTERNAL_WIDTH, INTERNAL_HEIGHT = 320, 240  # Resolución clásica de pixel art
-WINDOW_SCALE = 2  # Tamaño final de la ventana (se multiplicará por 2 -> 640x480)
-screen = pygame.display.set_mode((INTERNAL_WIDTH * WINDOW_SCALE, INTERNAL_HEIGHT * WINDOW_SCALE))
+    # 1. Ocultar el cursor de Windows
+    pygame.mouse.set_visible(False)
+    
+    # 2. Cargar el cursor personalizado
+    cursor_img = pygame.image.load("Imagenes/cursor_mouse.png").convert_alpha()
 
-# Superficie interna donde dibujaremos todo en baja resolución
-canvas = pygame.Surface((INTERNAL_WIDTH, INTERNAL_HEIGHT))
+    reloj = pygame.time.Clock()
 
-pygame.display.set_caption("Memotest Pixel Art")
-clock = pygame.time.Clock()
+    # 3. Inicializar la configuración global
+    configuracion = Configuracion()
+    
+    #Aplicar el volumen de la musica del juego Antes de Arrancar
+    pygame.mixer.music.set_volume(configuracion.get_volumen_musica())
 
-# 2. Cargar recursos (Sprites / Imágenes)
-# .convert_alpha() optimiza la imagen y respeta las transparencias (fondo transparente)
-dorso_carta = pygame.image.load("assets/cartas/dorso.png").convert_alpha()
+    
 
-# Coordenadas de ejemplo para dibujar una carta en el tablero virtual
-carta_x, carta_y = 50, 50
+    # 4. Instanciar los controladores inyectando la configuración
+    controlador_menu = MenuControlador(pantalla, configuracion)
+    controlador_ajuste = AjusteControlador(pantalla, configuracion)
+    # controlador_juego = JuegoControlador(pantalla, configuracion)
+    
+    controlador_actual = controlador_menu
+    estado_actual = "MENU"
 
-# 3. Bucle Principal del Juego (Game Loop)
-running = True
-while running:
-    # Manejo de eventos (clicks, cerrar ventana, etc.)
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-            pygame.quit()
-            sys.exit()
+    while True:
+        eventos = pygame.event.get()
+        for event in eventos:
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
 
-    # --- LÓGICA DE DIBUJO EN EL LIENZO INTERNO ---
-    canvas.fill((30, 30, 46)) # Color de fondo retro (ej: un azul oscuro/grisáceo)
+        # El controlador actual procesa la lógica y devuelve qué estado sigue
+        nuevo_estado = controlador_actual.actualizar(eventos)
 
-    # Dibujar la carta en el lienzo virtual
-    canvas.blit(dorso_carta, (carta_x, carta_y))
+        # 5. Máquina de estados bidireccional
+        if nuevo_estado != estado_actual:
+            if nuevo_estado == "MENU":
+                controlador_actual = controlador_menu
+            elif nuevo_estado == "JUEGO": # Corregido de "JUGAR" a "JUEGO"
+                pass # controlador_actual = controlador_juego
+            elif nuevo_estado == "AJUSTE":
+                controlador_actual = controlador_ajuste
+            elif nuevo_estado == "RANKING":
+                pass # controlador_actual = controlador_ranking
+            elif nuevo_estado == "SALIR":
+                pygame.quit()
+                sys.exit()
+            
+            estado_actual = nuevo_estado
 
-    # --- ESCALADO FINAL PARA MANTENER EL PIXEL ART NÍDITO ---
-    # Scalamos el canvas interno al tamaño de la ventana real usando transform.scale
-    scaled_surface = pygame.transform.scale(canvas, (INTERNAL_WIDTH * WINDOW_SCALE, INTERNAL_HEIGHT * WINDOW_SCALE))
-    screen.blit(scaled_surface, (0, 0))
+        # Dibujar cursor
+        pos_mouse = pygame.mouse.get_pos()
+        pantalla.blit(cursor_img, pos_mouse)
 
-    # Actualizar pantalla
-    pygame.display.flip()
-    clock.render_fps = 60
-    clock.tick(60)
+        pygame.display.flip()
+        reloj.tick(60)
+
+if __name__ == "__main__":
+    main()
