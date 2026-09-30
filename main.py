@@ -4,11 +4,12 @@ from Clases.Configuracion import Configuracion
 from Controlador.MenuControlador import MenuControlador
 from Controlador.RankingControlador import RankingControlador
 from Controlador.AjusteControlador import AjusteControlador
-# from Controlador.JuegoControlador import JuegoControlador
+from Controlador.ConfiguracionPartida import ConfiguracionPartidaControlador
+from Controlador.JuegoControlador import JuegoControlador
 
 def main():
     pygame.init()
-    pygame.mixer.init() #
+    pygame.mixer.init() 
     pantalla = pygame.display.set_mode((640, 480))
     pygame.display.set_caption("Memotest Pixel Art")
 
@@ -32,7 +33,7 @@ def main():
     controlador_menu = MenuControlador(pantalla, configuracion)
     controlador_ajuste = AjusteControlador(pantalla, configuracion)
     controlador_ranking = RankingControlador(pantalla,configuracion)
-    # controlador_juego = JuegoControlador(pantalla, configuracion)
+    controlador_config_partida = ConfiguracionPartidaControlador(pantalla, configuracion)
     
     controlador_actual = controlador_menu
     estado_actual = "MENU"
@@ -51,8 +52,14 @@ def main():
         if nuevo_estado != estado_actual:
             if nuevo_estado == "MENU":
                 controlador_actual = controlador_menu
-            elif nuevo_estado == "JUEGO": # Corregido de "JUGAR" a "JUEGO"
-                pass # controlador_actual = controlador_juego
+            elif nuevo_estado == "CONFIG_PARTIDA":
+                controlador_actual = controlador_config_partida
+                if nuevo_estado == "JUEGO":
+                    dificultad = controlador_config_partida.dificultad_seleccionada
+                    tiempo = controlador_config_partida.tiempo_seleccionado
+                    # Creamos el juego con esas opciones
+                    controlador_juego = JuegoControlador(pantalla, configuracion, dificultad, tiempo)
+                    controlador_actual = controlador_juego
             elif nuevo_estado == "AJUSTE":
                 controlador_actual = controlador_ajuste
             elif nuevo_estado == "RANKING":
