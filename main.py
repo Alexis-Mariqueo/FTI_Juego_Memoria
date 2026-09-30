@@ -2,6 +2,7 @@ import pygame
 import sys
 from Clases.Configuracion import Configuracion
 from Controlador.MenuControlador import MenuControlador
+from Controlador.RankingControlador import RankingControlador
 from Controlador.AjusteControlador import AjusteControlador
 # from Controlador.JuegoControlador import JuegoControlador
 
@@ -30,6 +31,7 @@ def main():
     # 4. Instanciar los controladores inyectando la configuración
     controlador_menu = MenuControlador(pantalla, configuracion)
     controlador_ajuste = AjusteControlador(pantalla, configuracion)
+    controlador_ranking = RankingControlador(pantalla,configuracion)
     # controlador_juego = JuegoControlador(pantalla, configuracion)
     
     controlador_actual = controlador_menu
@@ -54,7 +56,7 @@ def main():
             elif nuevo_estado == "AJUSTE":
                 controlador_actual = controlador_ajuste
             elif nuevo_estado == "RANKING":
-                pass # controlador_actual = controlador_ranking
+                controlador_actual = controlador_ranking
             elif nuevo_estado == "SALIR":
                 pygame.quit()
                 sys.exit()
