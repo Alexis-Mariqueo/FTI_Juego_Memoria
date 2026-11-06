@@ -40,6 +40,7 @@ class GameManager:
         # Configuraciones de partida
         self.difficulty = "facil"  # 'facil' (4 pares) o 'dificil' (8 pares)
         self.time_mode_seconds = 300.0  # 300s (5 min) o 600s (10 min)
+        self.mostrar_cartas_al_inicio = False
 
         # Variables de partida
         self.score = 200
@@ -55,6 +56,7 @@ class GameManager:
         self.first_selected: Optional[Card] = None
         self.second_selected: Optional[Card] = None
         self.mismatch_wait_timer: float = 0.0
+        self.preview_time_remaining: Optional[float]= None
 
         # Autómatas y audio
         self.automata = AutomataGameController(pairs_count=4)
@@ -184,7 +186,7 @@ class GameManager:
         # Fila 2: Botón de Sonido y Botón de Fundamentos Teóricos
         self.btn_sound = Button(
             rect=pygame.Rect(center_x - 220, 484, 215, 42),
-            text="Ajustes de Sonido 🔊",
+            text="Ajustes",
             callback=self.open_sound_settings,
             bg_color=(41, 128, 185),
             hover_color=(52, 152, 219),
@@ -219,7 +221,12 @@ class GameManager:
             screen_size=(self.screen_width, self.screen_height),
             sound_manager=self.sound,
             on_close=lambda: setattr(self, "active_modal", None),
+            mostrar_cartas=self.mostrar_cartas_al_inicio,
+            on_preview_change=self.set_card_preview,
         )
+
+    def set_card_preview(self, enabled: bool):
+        self.mostrar_cartas_al_inicio = enabled
 
     def quit_game(self):
         """Cierra la aplicación de forma limpia."""
@@ -246,7 +253,13 @@ class GameManager:
 
         self._build_board(pairs_count)
         self.state = STATE_PLAYING
-
+        self.preview_time_remaining= None
+        if self.mostrar_cartas_al_inicio:
+            self.preview_time_remaining = 3.0
+            self.status_message= "Memoriza las cartas.."
+            for card in self.cards:
+                card.flip_up()
+        
         # Iniciar música durante la partida
         self.sound.play_game_music()
 
@@ -354,6 +367,10 @@ class GameManager:
 
     def _on_card_clicked(self, card: Card):
         """Gestiona el intento de seleccionar una carta y aplica las reglas del autómata."""
+
+        if self.preview_time_remaining is not None:
+            return  # Ignorar clics durante la previsualización de cartas
+
         # 1. Si está esperando a que se volteen cartas erróneas
         if self.mismatch_wait_timer > 0.0:
             self._register_invalid_move("Carta tocada durante espera de animación ('x')")
@@ -559,6 +576,18 @@ class GameManager:
             c.update(dt)
 
         if self.state == STATE_PLAYING:
+            if self.preview_time_remaining is not None:
+                if self.preview_time_remaining > 0:
+                    self.preview_time_remaining = max(
+                        0.0, self.preview_time_remaining - dt
+                    )
+                    if self.preview_time_remaining == 0:
+                        for card in self.cards:
+                            card.flip_down()
+                elif all(card.can_click() for card in self.cards):
+                    self.preview_time_remaining = None
+                    self.status_message = "¡Comienza el juego! Selecciona dos cartas para buscar una coincidencia."
+                return  # No actualizar temporizador ni esperar errores durante la previsualización
             # 1. Temporizador de cuenta regresiva
             self.time_remaining -= dt
             if self.time_remaining <= 0.0:
