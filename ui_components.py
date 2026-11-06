@@ -465,7 +465,7 @@ class ModalDialog:
 class SoundSettingsModal:
     """Ventana interactiva de Ajustes de Audio: volumen y mute de música y efectos."""
 
-    def __init__(self, screen_size: Tuple[int, int], sound_manager, on_close: Callable):
+    def __init__(self, screen_size: Tuple[int, int], sound_manager, on_close: Callable, mostrar_cartas: bool, on_preview_change: Callable[[bool], None]):
         self.screen_size = screen_size
         self.sound = sound_manager
         self.on_close = on_close
@@ -483,6 +483,8 @@ class SoundSettingsModal:
         self.section_font = get_font(16, bold=True)
         self.label_font = get_font(14, bold=False)
         self.val_font = get_font(15, bold=True)
+        self.mostrar_cartas = mostrar_cartas
+        self.on_preview_change = on_preview_change
 
         self._build_controls()
 
@@ -525,6 +527,7 @@ class SoundSettingsModal:
         )
         self.buttons.append(self.btn_mus_mute)
 
+
         # 2. Controles de Efectos (SFX)
         row2_y = self.rect.y + 225
         # Botón [-] SFX
@@ -559,6 +562,16 @@ class SoundSettingsModal:
             font_size=14,
         )
         self.buttons.append(self.btn_sfx_mute)
+        # Botón de previsualización de cartas
+        self.btn_card_preview = Button(
+            rect=pygame.Rect(self.rect.x + 360, self.rect.y + 285,220,34),
+            text="Activado" if self.mostrar_cartas else "Desactivado",
+            callback=self._toggle_card_preview,
+            bg_color=(41,128,185),
+            hover_color=(52,152,219),
+            font_size=14,
+        )
+        self.buttons.append(self.btn_card_preview)
 
         # 3. Fila inferior: Probar sonido y Cerrar
         row3_y = self.rect.bottom - 58
@@ -578,6 +591,11 @@ class SoundSettingsModal:
     def _toggle_sfx_mute(self):
         self.sound.toggle_sfx_mute()
 
+    def _toggle_card_preview(self):
+        self.mostrar_cartas = not self.mostrar_cartas
+        self.btn_card_preview.text = "Activado" if self.mostrar_cartas else "Desactivado"
+        self.on_preview_change(self.mostrar_cartas)
+
     def handle_event(self, event: pygame.event.Event) -> bool:
         for btn in self.buttons:
             if btn.handle_event(event):
@@ -595,7 +613,7 @@ class SoundSettingsModal:
         pygame.draw.rect(surface, (60, 75, 105), self.rect, width=2, border_radius=14)
 
         # Título
-        title_surf = self.title_font.render("AJUSTES DE AUDIO Y VOLUMEN", True, (241, 196, 15))
+        title_surf = self.title_font.render("AJUSTES", True, (241, 196, 15))
         title_rect = title_surf.get_rect(center=(self.rect.centerx, self.rect.y + 34))
         surface.blit(title_surf, title_rect)
 
@@ -656,6 +674,18 @@ class SoundSettingsModal:
         self.btn_sfx_mute.bg_color = (39, 174, 96) if self.sound.sfx_muted else (192, 57, 43)
         self.btn_sfx_mute.hover_color = (46, 204, 113) if self.sound.sfx_muted else (231, 76, 60)
 
+        preview_label = self.section_font.render(
+            "Mostrar cartas al inicio", True, (236, 240, 241)
+        )
+        surface.blit(preview_label, (self.rect.x + 40, self.rect.y + 292))
+
+        if self.mostrar_cartas:
+            self.btn_card_preview.bg_color = (39, 174, 96)
+            self.btn_card_preview.hover_color = (46, 204, 113)
+        else:
+            self.btn_card_preview.bg_color = (192, 57, 43)
+            self.btn_card_preview.hover_color = (231, 76, 60)
+        
         # Dibujar todos los botones
         for btn in self.buttons:
             btn.draw(surface)
