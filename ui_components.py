@@ -297,7 +297,7 @@ class StackVisualizer:
         desc_lines = [
             f"Condición: Aceptación por pila vacía",
             f"Regla actual: {last_transition}",
-            f"Vidas activas: {'❤️ ' * lives}{'🖤 ' * (5 - lives)}",
+            f"Vidas activas: {lives}/5",
         ]
         for line in desc_lines:
             ln_surf = self.info_font.render(line, True, (200, 210, 225))
@@ -644,7 +644,7 @@ class SoundSettingsModal:
             pygame.draw.rect(surface, (52, 152, 219), fill1_rect, border_radius=4)
 
         # Actualizar texto del botón de mute música
-        self.btn_mus_mute.text = "Activar Música 🔊" if self.sound.music_muted else "Silenciar Música 🔇"
+        self.btn_mus_mute.text = "Activar Música" if self.sound.music_muted else "Silenciar Música"
         self.btn_mus_mute.bg_color = (39, 174, 96) if self.sound.music_muted else (192, 57, 43)
         self.btn_mus_mute.hover_color = (46, 204, 113) if self.sound.music_muted else (231, 76, 60)
 
@@ -670,7 +670,7 @@ class SoundSettingsModal:
             pygame.draw.rect(surface, (46, 204, 113), fill2_rect, border_radius=4)
 
         # Actualizar texto del botón de mute SFX
-        self.btn_sfx_mute.text = "Activar Efectos 🔔" if self.sound.sfx_muted else "Silenciar Efectos 🔕"
+        self.btn_sfx_mute.text = "Activar Efectos" if self.sound.sfx_muted else "Silenciar Efectos"
         self.btn_sfx_mute.bg_color = (39, 174, 96) if self.sound.sfx_muted else (192, 57, 43)
         self.btn_sfx_mute.hover_color = (46, 204, 113) if self.sound.sfx_muted else (231, 76, 60)
 

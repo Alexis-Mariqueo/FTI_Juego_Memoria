@@ -99,7 +99,7 @@ class GameManager:
         )
         self.btn_hud_sound = Button(
             pygame.Rect(820 + (btn_w + gap) * 2, btn_y, btn_w, 40),
-            "Sonido 🔊",
+            "Sonido",
             callback=self.open_sound_settings,
             bg_color=(230, 126, 34),
             hover_color=(243, 156, 18),
@@ -207,7 +207,7 @@ class GameManager:
         # Fila 3: Botón para Salir del Juego
         self.btn_quit = Button(
             rect=pygame.Rect(center_x - 220, 538, 440, 38),
-            text="Salir del Juego ✕",
+            text="Salir del Juego",
             callback=self.quit_game,
             bg_color=(192, 57, 43),
             hover_color=(231, 76, 60),
