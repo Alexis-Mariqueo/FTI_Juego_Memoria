@@ -287,7 +287,7 @@ class StackVisualizer:
                 if i == len(stack) - 1:
                     arrow_x = box_x + box_w + 10
                     arrow_y = ey + elem_h // 2
-                    top_label = self.info_font.render("◀ TOPE", True, (241, 196, 15))
+                    top_label = self.info_font.render("TOPE", True, (241, 196, 15))
                     surface.blit(top_label, (arrow_x, arrow_y - 8))
 
         # Panel explicativo al lado derecho de la pila
