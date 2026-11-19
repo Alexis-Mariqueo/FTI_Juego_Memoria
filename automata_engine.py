@@ -6,6 +6,7 @@ Integrantes: Alexis Mariqueo, Cesar Millavanque, Daniel Enegron, Kadir Martinez
 Este módulo define formalmente:
 1. Autómata Finito Determinista (AFD) completo para el progreso de la partida.
 2. Autómata de Pila Determinista (AP / DPDA) para el control de errores y vidas.
+3. Autómata de Pila Determinista (AP / DPDA) para el control y cuenta regresiva del tiempo.
 """
 
 from typing import Dict, List, Optional, Set, Tuple
@@ -107,38 +108,93 @@ def build_lives_pda() -> DPDA:
     )
 
 
+def build_time_pda(minutes: int = 5) -> DPDA:
+    """
+    Construye el Autómata de Pila Determinista (DPDA) para la cuenta regresiva del tiempo:
+    - Q (Estados): {q0, q1, q2}
+    - ΣE (Alfabeto de entrada leído): {t} (donde 't' representa el paso de un minuto)
+    - ΣP (Alfabeto de la pila): {Z, M} (Z = fondo de pila, M = un minuto restante)
+    - Estado Inicial: q0
+    - Símbolo Inicial de Pila: Z
+    - Estados Finales: {q2}
+    - Condición de Aceptación: Por pila vacía (acceptance_mode='empty_stack')
+
+    Transiciones:
+    - (q0, λ, Z) -> (q1, M...MZ)   [Carga inicial de 5 o 10 minutos con Z al fondo]
+    - (q1, t, M) -> (q1, λ)        [Cada minuto transcurrido 't' desapila una 'M']
+    - (q1, λ, Z) -> (q2, λ)        [Al consumir los M, tope es Z; por λ pasa a q2 vaciando la pila -> DERROTA]
+    """
+    m_stack = tuple(["M"] * minutes + ["Z"])
+    return DPDA(
+        states={"q0", "q1", "q2"},
+        input_symbols={"t"},
+        stack_symbols={"Z", "M"},
+        transitions={
+            "q0": {
+                "": {
+                    "Z": ("q1", m_stack)
+                }
+            },
+            "q1": {
+                "t": {"M": ("q1", "")},
+                "": {"Z": ("q2", "")}
+            },
+            "q2": {}
+        },
+        initial_state="q0",
+        initial_stack_symbol="Z",
+        final_states={"q2"},
+        acceptance_mode="empty_stack"
+    )
+
+
 class AutomataGameController:
     """
-    Controlador en tiempo real que ejecuta el AFD de progreso y el AP de vidas.
+    Controlador en tiempo real que ejecuta el AFD de progreso, el AP de vidas y el AP de tiempo.
     Mantiene la sincronía entre el juego interactivo y los modelos teóricos de automata-lib.
     """
 
-    def __init__(self, pairs_count: int = 4):
+    def __init__(self, pairs_count: int = 4, time_minutes: int = 5):
         self.pairs_count = pairs_count
+        self.time_minutes = time_minutes
         self.dfa = build_progress_dfa(pairs_count)
         self.pda = build_lives_pda()
-        self.reset(pairs_count)
+        self.time_pda = build_time_pda(time_minutes)
+        self.reset(pairs_count, time_minutes)
 
-    def reset(self, pairs_count: Optional[int] = None):
-        """Reinicia los autómatas a su estado inicial."""
+    def reset(self, pairs_count: Optional[int] = None, time_minutes: Optional[int] = None):
+        """Reinicia los tres autómatas a su estado inicial."""
         if pairs_count is not None:
             self.pairs_count = pairs_count
             self.dfa = build_progress_dfa(pairs_count)
 
+        if time_minutes is not None:
+            self.time_minutes = time_minutes
+            self.time_pda = build_time_pda(time_minutes)
+
+        # 1. AFD de progreso
         self.word_history: str = ""
         self.dfa_state: str = "q0"
         self.dfa_history: List[str] = ["q0"]
-        
-        # Estado inicial del AP tras transición lambda inicial (q0 -> q1 con 5 V y Z)
+        self.last_transition_dfa: str = "q0 (Inicio)"
+        self.last_symbol: Optional[str] = None
+        self.is_victory: bool = False
+
+        # 2. AP de vidas (5 vidas V con fondo Z)
         self.pda_state: str = "q1"
         self.pda_stack: List[str] = ["Z", "V", "V", "V", "V", "V"]
         self.pda_history: List[Tuple[str, List[str]]] = [("q1", list(self.pda_stack))]
-        
-        self.is_victory: bool = False
         self.is_defeat_by_errors: bool = False
-        self.last_transition_dfa: str = "q0 (Inicio)"
         self.last_transition_pda: str = "λ, Z ; VVVVVZ"
-        self.last_symbol: Optional[str] = None
+
+        # 3. AP de tiempo (M...MZ según 5 o 10 minutos)
+        self.time_word_history: str = ""
+        self.time_pda_state: str = "q1"
+        self.time_pda_stack: List[str] = ["Z"] + ["M"] * self.time_minutes
+        self.time_pda_history: List[Tuple[str, List[str]]] = [("q1", list(self.time_pda_stack))]
+        self.is_defeat_by_time: bool = False
+        m_str = "M" * self.time_minutes
+        self.last_transition_time_pda: str = f"λ, Z ; {m_str}Z"
 
     def step(self, symbol: str) -> dict:
         """
@@ -220,4 +276,58 @@ class AutomataGameController:
             return int(self.dfa_state.replace("q", ""))
         except ValueError:
             return 0
+
+    def step_time(self) -> dict:
+        """
+        Procesa el transcurso de un minuto con el símbolo 't' en el AP de tiempo.
+        Desapila un símbolo 'M' (t, M ; λ).
+        Al agotarse los minutos, se ejecuta λ, Z ; λ alcanzando q2 con pila vacía (Derrota).
+        """
+        if self.is_defeat_by_time or self.time_pda_state == "q2":
+            return {
+                "symbol": "t",
+                "time_pda_state": self.time_pda_state,
+                "time_pda_stack": list(self.time_pda_stack),
+                "minutes_left": 0,
+                "is_defeat_by_time": True,
+                "time_transition": self.last_transition_time_pda,
+            }
+
+        prev_state = self.time_pda_state
+        self.time_word_history += "t"
+
+        configs = []
+        accepted = False
+        try:
+            for cfg in self.time_pda.read_input_stepwise(self.time_word_history):
+                configs.append(cfg)
+            accepted = True
+        except RejectionException:
+            accepted = False
+
+        if configs:
+            last_cfg = configs[-1]
+            self.time_pda_state = last_cfg.state
+            self.time_pda_stack = list(last_cfg.stack)
+            self.time_pda_history.append((self.time_pda_state, list(self.time_pda_stack)))
+
+        if accepted or (self.time_pda_state == "q2" and len(self.time_pda_stack) == 0):
+            self.is_defeat_by_time = True
+            self.last_transition_time_pda = f"({prev_state}, t, M) -> (q1, λ) -> λ, Z;λ -> (q2, λ)"
+        else:
+            self.last_transition_time_pda = f"({prev_state}, t, M) -> ({self.time_pda_state}, λ)"
+
+        return {
+            "symbol": "t",
+            "time_pda_state": self.time_pda_state,
+            "time_pda_stack": list(self.time_pda_stack),
+            "minutes_left": self.minutes_left,
+            "is_defeat_by_time": self.is_defeat_by_time,
+            "time_transition": self.last_transition_time_pda,
+        }
+
+    @property
+    def minutes_left(self) -> int:
+        """Cantidad de minutos restantes según los símbolos 'M' en la pila del AP de tiempo."""
+        return self.time_pda_stack.count("M")
 

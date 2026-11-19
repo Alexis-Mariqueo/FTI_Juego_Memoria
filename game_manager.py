@@ -45,6 +45,7 @@ class GameManager:
         # Variables de partida
         self.score = 200
         self.time_remaining = self.time_mode_seconds
+        self.minute_timer = 0.0
         self.total_errors = 0
         self.total_matches = 0
         self.total_invalids = 0
@@ -58,8 +59,9 @@ class GameManager:
         self.mismatch_wait_timer: float = 0.0
         self.preview_time_remaining: Optional[float]= None
 
-        # Autómatas y audio
-        self.automata = AutomataGameController(pairs_count=4)
+        # Autómatas y audio (AFD progreso, AP vidas, AP tiempo)
+        initial_mins = int(self.time_mode_seconds // 60)
+        self.automata = AutomataGameController(pairs_count=4, time_minutes=initial_mins)
         self.sound = SoundManager(enabled=True)
         self.is_running = True
 
@@ -236,10 +238,12 @@ class GameManager:
     def start_game(self):
         """Prepara e inicia una nueva partida con la configuración elegida."""
         pairs_count = 4 if self.difficulty == "facil" else 8
-        self.automata.reset(pairs_count)
+        time_minutes = int(self.time_mode_seconds // 60)
+        self.automata.reset(pairs_count=pairs_count, time_minutes=time_minutes)
 
         self.score = 200
         self.time_remaining = self.time_mode_seconds
+        self.minute_timer = 0.0
         self.total_errors = 0
         self.total_matches = 0
         self.total_invalids = 0
@@ -352,6 +356,7 @@ class GameManager:
             self.btn_menu.handle_event(event)
             self.btn_hud_sound.handle_event(event)
             self.btn_theory.handle_event(event)
+            self.stack_view.handle_event(event)
 
             # Hover en cartas
             if event.type == pygame.MOUSEMOTION:
@@ -468,6 +473,7 @@ class GameManager:
             f"• Jugadas inválidas (x): {self.total_invalids}",
             f"• Estado del AFD: {self.automata.dfa_state} (ESTADO DE ACEPTACIÓN)",
             f"• Cadena procesada w: {self.automata.word_history}",
+            f"• AP de Tiempo: No aceptó (Pila no vacía, {self.automata.minutes_left} min restantes en pila)",
             f"El autómata determinista validó con éxito todos los aciertos requeridos.",
         ]
 
@@ -515,7 +521,7 @@ class GameManager:
         )
 
     def _handle_defeat_by_time(self):
-        """Desencadena el fin de juego por tiempo agotado."""
+        """Desencadena el fin de juego por tiempo agotado (Aceptación por pila vacía en el AP de Tiempo)."""
         self.state = STATE_GAME_OVER
         self.score = 0
         self.sound.stop_music()
@@ -523,16 +529,18 @@ class GameManager:
 
         lines = [
             f"## TIEMPO AGOTADO (00:00)",
-            f"• El temporizador llegó a cero antes de completar el tablero.",
+            f"• El Autómata de Pila de Tiempo (AP) consumió todas las 'M' de su pila.",
+            f"• Se ejecutó la transición λ, Z ; λ alcanzando el estado q2.",
+            f"• Condición de aceptación por PILA VACÍA cumplida en el AP de Tiempo.",
             f"• Según las reglas del proyecto, el puntaje general pasa a ser 0.",
             f"• Pares descubiertos: {self.automata.pairs_found} / {self.automata.pairs_count}",
             f"• Errores cometidos: {self.total_errors}",
-            f"• Cadena procesada w: {self.automata.word_history}",
+            f"• Minutos transcurridos en el AP (cadena 't'): {self.automata.time_word_history}",
         ]
 
         self.active_modal = ModalDialog(
-            width=620,
-            height=350,
+            width=650,
+            height=370,
             screen_size=(self.screen_width, self.screen_height),
             title="TIEMPO AGOTADO",
             content_lines=lines,
@@ -548,13 +556,16 @@ class GameManager:
         lines = [
             f"## FUNDAMENTOS TEÓRICOS DE INFORMÁTICA - GRUPO N°2",
             f"Integrantes: Alexis Mariqueo, Cesar Millavanque, Daniel Enegron, Kadir Martinez (2026)",
-            f"• Alfabeto de Entrada: Σ = {{a, e, x}} (a: acierto, e: error, x: inválido)",
-            f"• AFD de Progreso: Quíntupla (Σ, Q, δ, q0, F). Estados {{q0..qN, q_sumidero}}.",
-            f"  Avanza únicamente con el símbolo 'a'. Los errores y jugadas inválidas permanecen en el estado.",
-            f"• AP de Control de Vidas: Estados {{q0, q1, q2}}, Alfabeto Pila {{Z, V}}.",
-            f"  Inicia con 5 vidas (VVVVVZ). Cada error 'e' desapila una 'V'. Al 5to error, se desapila 'Z'",
-            f"  y la pila queda totalmente vacía (Aceptación por Pila Vacía = Derrota).",
-            f"• Expresión Regular Ganadora (Fácil): (e+x)* a (e+x)* a (e+x)* a (e+x)* a",
+            f"• Alfabeto de Entrada (Juego): Σ = {{a, e, x}} (a: acierto, e: error, x: inválido)",
+            f"• 1. AFD de Progreso: Quíntupla (Σ, Q, δ, q0, F). Estados {{q0..qN, q_sumidero}}.",
+            f"  Avanza con 'a'. Errores 'e' e inválidos 'x' permanecen en el estado sin avanzar.",
+            f"• 2. AP de Vidas: Estados {{q0, q1, q2}}, Alfabeto Pila {{Z, V}}.",
+            f"  Inicia con 5 vidas (VVVVVZ). Cada error 'e' desapila 'V'. Al 5to error lee λ, Z; λ",
+            f"  alcanzando q2 con PILA VACÍA (Aceptación por Pila Vacía = Derrota por vidas).",
+            f"• 3. AP de Tiempo: Estados {{q0, q1, q2}}, Alfabeto Entrada {{t}}, Alfabeto Pila {{Z, M}}.",
+            f"  Carga inicial λ (MMMMMZ o 10 M con Z al fondo). Cada minuto lee 't' y desapila 'M'.",
+            f"  Al agotarse los minutos lee λ, Z; λ a q2 (Aceptación por Pila Vacía = Derrota por tiempo).",
+            f"• Si la partida termina antes (victoria o errores), el AP no recibe más 't' y no acepta.",
         ]
 
         self.active_modal = ModalDialog(
@@ -588,10 +599,18 @@ class GameManager:
                     self.preview_time_remaining = None
                     self.status_message = "¡Comienza el juego! Selecciona dos cartas para buscar una coincidencia."
                 return  # No actualizar temporizador ni esperar errores durante la previsualización
-            # 1. Temporizador de cuenta regresiva
+            # 1. Temporizador de cuenta regresiva gobernado por el AP de Tiempo
             self.time_remaining -= dt
-            if self.time_remaining <= 0.0:
+            self.minute_timer += dt
+            if self.minute_timer >= 60.0:
+                self.minute_timer -= 60.0
+                self.automata.step_time()
+
+            # Comprobar si el AP de Tiempo aceptó por pila vacía (Derrota por tiempo)
+            if self.time_remaining <= 0.0 or self.automata.is_defeat_by_time:
                 self.time_remaining = 0.0
+                if not self.automata.is_defeat_by_time:
+                    self.automata.step_time()
                 self._handle_defeat_by_time()
                 return
 
@@ -703,13 +722,19 @@ class GameManager:
             self.automata.last_transition_dfa,
         )
 
-        # 6. Panel derecho: Visualizador de la Pila (AP)
+        # 6. Panel derecho: Visualizador de la Pila (AP Vidas y AP Tiempo)
         self.stack_view.draw(
             surface,
-            self.automata.pda_stack,
-            self.automata.pda_state,
-            self.automata.lives,
-            self.automata.last_transition_pda,
+            lives_stack=self.automata.pda_stack,
+            lives_state=self.automata.pda_state,
+            lives=self.automata.lives,
+            lives_transition=self.automata.last_transition_pda,
+            time_stack=self.automata.time_pda_stack,
+            time_state=self.automata.time_pda_state,
+            time_minutes=self.automata.minutes_left,
+            time_transition=self.automata.last_transition_time_pda,
+            total_time_minutes=self.automata.time_minutes,
+            time_word=self.automata.time_word_history,
         )
 
         # 7. Botones de acción
@@ -756,19 +781,19 @@ class GameManager:
         surface.blit(lbl_score, (self.hud_rect.x + 18, self.hud_rect.y + 12))
         surface.blit(val_score, (self.hud_rect.x + 18, self.hud_rect.y + 34))
 
-        # 2. Tiempo Restante
+        # 2. Tiempo Restante (Gobernado por AP de Tiempo)
         mins = int(self.time_remaining // 60)
         secs = int(self.time_remaining % 60)
         time_str = f"{mins:02d}:{secs:02d}"
         time_col = (231, 76, 60) if self.time_remaining <= 60 else (52, 152, 219)
 
-        lbl_time = lbl_font.render("TIEMPO", True, (140, 155, 180))
+        lbl_time = lbl_font.render("TIEMPO (AP)", True, (140, 155, 180))
         val_time = val_font.render(time_str, True, time_col)
         surface.blit(lbl_time, (self.hud_rect.x + 160, self.hud_rect.y + 12))
         surface.blit(val_time, (self.hud_rect.x + 160, self.hud_rect.y + 34))
 
-        # 3. Vidas Restantes
-        lbl_lives = lbl_font.render("VIDAS (PILA)", True, (140, 155, 180))
+        # 3. Vidas Restantes (Gobernadas por AP de Vidas)
+        lbl_lives = lbl_font.render("VIDAS (AP)", True, (140, 155, 180))
         val_lives = val_font.render(f"{self.automata.lives} / 5", True, (46, 204, 113) if self.automata.lives > 1 else (231, 76, 60))
         surface.blit(lbl_lives, (self.hud_rect.x + 300, self.hud_rect.y + 12))
         surface.blit(val_lives, (self.hud_rect.x + 300, self.hud_rect.y + 34))
