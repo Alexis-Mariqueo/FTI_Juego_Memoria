@@ -107,28 +107,28 @@ class Card:
         else:
             rendered_surf = target_img
 
-        # Sombra sutil
+        # Sombra sutil cálida
         shadow_rect = draw_rect.copy()
         shadow_rect.x += 3
         shadow_rect.y += 4
         shadow_surf = pygame.Surface((draw_rect.width, draw_rect.height), pygame.SRCALPHA)
-        shadow_surf.fill((0, 0, 0, 60))
+        shadow_surf.fill((45, 28, 32, 75))
         surface.blit(shadow_surf, shadow_rect)
 
         # Dibujar la carta
         surface.blit(rendered_surf, draw_rect)
 
-        # Bordes destacados según estado
+        # Bordes estilizados en paleta cálida pastel (sin bordes negros duros / selective outline)
         if self.state == STATE_MATCHED:
-            # Borde verde esmeralda / dorado para pares resueltos
-            pygame.draw.rect(surface, (46, 204, 113), draw_rect, width=3, border_radius=6)
+            # Resalte cálido verde salvia pastel y oro suave para par acertado
+            pygame.draw.rect(surface, (142, 198, 142), draw_rect, width=3, border_radius=6)
         elif self.state == STATE_FACE_UP:
-            # Borde cian vibrante para la carta actualmente seleccionada
-            pygame.draw.rect(surface, (52, 152, 219), draw_rect, width=3, border_radius=6)
+            # Resalte cálido melocotón / ámbar pastel para carta volteada
+            pygame.draw.rect(surface, (238, 178, 122), draw_rect, width=3, border_radius=6)
         elif self.is_hovered and self.state == STATE_FACE_DOWN:
-            # Borde sutil al pasar el cursor
-            pygame.draw.rect(surface, (241, 196, 15), draw_rect, width=2, border_radius=6)
+            # Resalte suave mantequilla dorada al posar el cursor
+            pygame.draw.rect(surface, (246, 222, 148), draw_rect, width=2, border_radius=6)
         else:
-            # Borde normal oscuro fino
-            pygame.draw.rect(surface, (40, 50, 70), draw_rect, width=1, border_radius=6)
+            # Borde sutil tono tierra / madera suave (selective outline cálido)
+            pygame.draw.rect(surface, (135, 105, 92), draw_rect, width=1, border_radius=6)
 
