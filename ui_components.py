@@ -631,11 +631,11 @@ class SoundSettingsModal:
         )
         self.buttons.append(self.btn_card_preview)
 
-        # 4. Fila inferior: Guardar y Cerrar
+        # 4. Fila inferior: Guardar y Salir
         row4_y = self.rect.bottom - 56
         self.btn_close = Button(
             rect=pygame.Rect(self.rect.centerx - 110, row4_y, 220, 40),
-            text="Guardar y Cerrar",
+            text="Guardar y Salir",
             callback=self._save_and_close,
             bg_color=COZY_GREEN_SAGE,
             hover_color=COZY_GREEN_HOVER,
@@ -751,3 +751,206 @@ class SoundSettingsModal:
         # Dibujar todos los botones
         for btn in self.buttons:
             btn.draw(surface)
+
+
+class SettingsHubModal:
+    """Ventana central de Ajustes con accesos a Ajuste de Sonido y Ajuste de Pantalla."""
+
+    def __init__(
+        self,
+        screen_size: Tuple[int, int],
+        on_open_sound: Callable[[], None],
+        on_open_screen: Callable[[], None],
+        on_close: Callable[[], None],
+    ):
+        self.screen_size = screen_size
+        self.on_open_sound = on_open_sound
+        self.on_open_screen = on_open_screen
+        self.on_close = on_close
+
+        width = 460
+        height = 360
+        self.rect = pygame.Rect(
+            (screen_size[0] - width) // 2,
+            (screen_size[1] - height) // 2,
+            width,
+            height,
+        )
+
+        self.title_font = get_font(24, bold=True)
+        self.desc_font = get_font(14, bold=False)
+
+        btn_w = 320
+        btn_h = 46
+        cx = self.rect.centerx - btn_w // 2
+
+        self.buttons: List[Button] = [
+            Button(
+                rect=pygame.Rect(cx, self.rect.y + 110, btn_w, btn_h),
+                text="Ajuste de Sonido",
+                callback=self.on_open_sound,
+                bg_color=COZY_AMBER,
+                hover_color=COZY_AMBER_HOVER,
+                font_size=16,
+                border_radius=10,
+            ),
+            Button(
+                rect=pygame.Rect(cx, self.rect.y + 175, btn_w, btn_h),
+                text="Ajuste de Pantalla",
+                callback=self.on_open_screen,
+                bg_color=COZY_SLATE_PURPLE,
+                hover_color=COZY_SLATE_PURPLE_HOVER,
+                font_size=16,
+                border_radius=10,
+            ),
+            Button(
+                rect=pygame.Rect(cx, self.rect.y + 265, btn_w, 42),
+                text="Volver",
+                callback=self.on_close,
+                bg_color=COZY_TERRACOTTA,
+                hover_color=COZY_TERRACOTTA_HOVER,
+                font_size=15,
+                border_radius=8,
+            ),
+        ]
+
+    def handle_event(self, event: pygame.event.Event) -> bool:
+        for btn in self.buttons:
+            if btn.handle_event(event):
+                return True
+        return False
+
+    def draw(self, surface: pygame.Surface):
+        # Capa ambiental cálida de fondo
+        overlay = pygame.Surface(self.screen_size, pygame.SRCALPHA)
+        overlay.fill((30, 20, 26, 205))
+        surface.blit(overlay, (0, 0))
+
+        # Cuadro principal
+        draw_cozy_panel(surface, self.rect, border_radius=14, bg_color=(48, 36, 44), border_color=(105, 82, 92), alpha=245)
+
+        # Título
+        title_surf = self.title_font.render("AJUSTES", True, COZY_TEXT_GOLD)
+        surface.blit(title_surf, title_surf.get_rect(center=(self.rect.centerx, self.rect.y + 36)))
+
+        # Separador decorativo
+        sep_y = self.rect.y + 64
+        pygame.draw.line(surface, (88, 68, 76), (self.rect.x + 30, sep_y), (self.rect.right - 30, sep_y), 2)
+
+        # Descripción
+        desc_surf = self.desc_font.render("Selecciona la categoría que deseas configurar:", True, COZY_TEXT_MUTED)
+        surface.blit(desc_surf, desc_surf.get_rect(center=(self.rect.centerx, self.rect.y + 86)))
+
+        # Botones
+        for btn in self.buttons:
+            btn.draw(surface)
+
+
+class ScreenSettingsModal:
+    """Ventana interactiva de Ajuste de Pantalla: Modo Ventana y Pantalla Completa adaptativa."""
+
+    def __init__(
+        self,
+        screen_size: Tuple[int, int],
+        is_fullscreen: bool,
+        on_save_and_exit: Callable[[bool], None],
+    ):
+        self.screen_size = screen_size
+        self.is_fullscreen = is_fullscreen
+        self.selected_mode = "fullscreen" if is_fullscreen else "window"
+        self.on_save_and_exit = on_save_and_exit
+
+        width = 600
+        height = 420
+        self.rect = pygame.Rect(
+            (screen_size[0] - width) // 2,
+            (screen_size[1] - height) // 2,
+            width,
+            height,
+        )
+
+        self.title_font = get_font(22, bold=True)
+        self.section_font = get_font(15, bold=True)
+        self.info_font = get_font(13, bold=False)
+
+        # Selector de modo de pantalla
+        self.selector = SegmentedSelector(
+            x=self.rect.x + 40,
+            y=self.rect.y + 115,
+            width=520,
+            height=46,
+            options=[
+                ("Modo Ventana (1280x720)", "window"),
+                ("Pantalla Completa", "fullscreen"),
+            ],
+            selected_value=self.selected_mode,
+            on_change=self._on_mode_change,
+        )
+
+        # Botón Guardar y Salir
+        btn_w = 240
+        btn_h = 42
+        self.btn_save_exit = Button(
+            rect=pygame.Rect(self.rect.centerx - btn_w // 2, self.rect.bottom - 58, btn_w, btn_h),
+            text="Guardar y Salir",
+            callback=self._apply_and_close,
+            bg_color=COZY_GREEN_SAGE,
+            hover_color=COZY_GREEN_HOVER,
+            font_size=15,
+            border_radius=8,
+        )
+
+    def _on_mode_change(self, val: str):
+        self.selected_mode = val
+
+    def _apply_and_close(self):
+        new_fullscreen = (self.selected_mode == "fullscreen")
+        self.on_save_and_exit(new_fullscreen)
+
+    def handle_event(self, event: pygame.event.Event) -> bool:
+        if self.selector.handle_event(event):
+            return True
+        if self.btn_save_exit.handle_event(event):
+            return True
+        return False
+
+    def draw(self, surface: pygame.Surface):
+        # Capa ambiental cálida de fondo
+        overlay = pygame.Surface(self.screen_size, pygame.SRCALPHA)
+        overlay.fill((30, 20, 26, 205))
+        surface.blit(overlay, (0, 0))
+
+        # Ventana del modal
+        draw_cozy_panel(surface, self.rect, border_radius=14, bg_color=(48, 36, 44), border_color=(105, 82, 92), alpha=245)
+
+        # Título
+        title_surf = self.title_font.render("AJUSTE DE PANTALLA", True, COZY_TEXT_GOLD)
+        surface.blit(title_surf, title_surf.get_rect(center=(self.rect.centerx, self.rect.y + 34)))
+
+        # Separador decorativo
+        sep_y = self.rect.y + 60
+        pygame.draw.line(surface, (88, 68, 76), (self.rect.x + 30, sep_y), (self.rect.right - 30, sep_y), 2)
+
+        # Subtítulo de sección
+        sec_surf = self.section_font.render("Selecciona el formato de visualización:", True, COZY_TEXT_MAIN)
+        surface.blit(sec_surf, (self.rect.x + 40, self.rect.y + 80))
+
+        # Selector interactivo
+        self.selector.draw(surface)
+
+        # Panel explicativo adaptativo a cualquier resolución
+        info_lines = [
+            "• Modo Ventana: Ejecuta el juego en ventana estándar a 1280x720 píxeles.",
+            "• Pantalla Completa: Se adapta automáticamente a cualquier monitor",
+            "  de computadora (Full HD, 2K, 4K, laptops) manteniendo la proporción",
+            "  16:9 con escalado nítido (pixel perfect) sin distorsión.",
+        ]
+        cur_y = self.rect.y + 185
+        for line in info_lines:
+            txt_col = (250, 226, 182) if ("Pantalla Completa:" in line or "Modo Ventana:" in line) else (210, 195, 185)
+            line_surf = self.info_font.render(line, True, txt_col)
+            surface.blit(line_surf, (self.rect.x + 40, cur_y))
+            cur_y += 24
+
+        # Botón Guardar y Salir
+        self.btn_save_exit.draw(surface)

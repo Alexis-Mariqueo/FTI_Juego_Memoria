@@ -4,6 +4,7 @@ Controla el flujo de estados, cronómetro, puntuación, interacción con cartas,
 reproducción de sonidos y sincronización con el controlador de autómatas.
 """
 
+import json
 import os
 import random
 import pygame
@@ -16,7 +17,9 @@ from ui_components import (
     Button,
     DFAGraphVisualizer,
     ModalDialog,
+    ScreenSettingsModal,
     SegmentedSelector,
+    SettingsHubModal,
     SoundSettingsModal,
     StackVisualizer,
     WordHistoryView,
@@ -76,6 +79,11 @@ class GameManager:
         # Iniciar música del menú principal
         self.sound.play_menu_music()
 
+        # Configuración de pantalla completa adaptativa
+        self.is_fullscreen = False
+        self.display_config_path = "display_settings.json"
+        self._load_display_config()
+
         # Fondos Pixel Art acogedores
         self.menu_bg: Optional[pygame.Surface] = None
         self.game_bg: Optional[pygame.Surface] = None
@@ -114,11 +122,11 @@ class GameManager:
         )
         self.btn_hud_sound = Button(
             pygame.Rect(820 + (btn_w + gap) * 2, btn_y, btn_w, 40),
-            "Ajuste Sonido",
-            callback=self.open_sound_settings,
+            "Ajustes",
+            callback=self.open_settings_hub,
             bg_color=COZY_AMBER,
             hover_color=COZY_AMBER_HOVER,
-            font_size=12,
+            font_size=13,
         )
         self.btn_theory = Button(
             pygame.Rect(820 + (btn_w + gap) * 3, btn_y, btn_w, 40),
@@ -219,14 +227,14 @@ class GameManager:
             border_radius=10,
         )
 
-        # Fila 2: Botón de Sonido y Botón de Fundamentos Teóricos
+        # Fila 2: Botón de Ajustes (Sonido y Pantalla) y Botón de Fundamentos Teóricos
         self.btn_sound = Button(
             rect=pygame.Rect(center_x - 220, 484, 215, 42),
-            text="Ajuste de Sonido",
-            callback=self.open_sound_settings,
+            text="Ajustes",
+            callback=self.open_settings_hub,
             bg_color=COZY_AMBER,
             hover_color=COZY_AMBER_HOVER,
-            font_size=14,
+            font_size=15,
             border_radius=8,
         )
 
@@ -251,23 +259,76 @@ class GameManager:
             border_radius=8,
         )
 
+    def _load_display_config(self):
+        """Carga la configuración de pantalla completa desde display_settings.json."""
+        if os.path.exists(self.display_config_path):
+            try:
+                with open(self.display_config_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self.is_fullscreen = bool(data.get("fullscreen", False))
+            except Exception as e:
+                print(f"Aviso: No se pudo leer {self.display_config_path}: {e}")
+        else:
+            self._save_display_config()
+
+    def _save_display_config(self):
+        """Guarda la configuración de pantalla completa en display_settings.json."""
+        try:
+            with open(self.display_config_path, "w", encoding="utf-8") as f:
+                json.dump({"fullscreen": self.is_fullscreen}, f, indent=4)
+        except Exception as e:
+            print(f"Error guardando {self.display_config_path}: {e}")
+
+    def apply_display_mode(self):
+        """Aplica la resolución con escalado automático para cualquier pantalla."""
+        flags = pygame.SCALED
+        if self.is_fullscreen:
+            flags |= pygame.FULLSCREEN
+        pygame.display.set_mode((self.screen_width, self.screen_height), flags)
+
+    def open_settings_hub(self):
+        """Abre el menú principal de Ajustes (con botones para Ajuste de Sonido y Ajuste de Pantalla)."""
+        self.active_modal = SettingsHubModal(
+            screen_size=(self.screen_width, self.screen_height),
+            on_open_sound=self.open_sound_settings,
+            on_open_screen=self.open_screen_settings,
+            on_close=lambda: setattr(self, "active_modal", None),
+        )
+
     def open_sound_settings(self):
-        """Abre la ventana modal interactiva de ajustes de audio."""
+        """Abre la ventana modal interactiva de ajustes de audio. Guardar y Salir regresa al hub de ajustes."""
         self.active_modal = SoundSettingsModal(
             screen_size=(self.screen_width, self.screen_height),
             sound_manager=self.sound,
-            on_close=lambda: setattr(self, "active_modal", None),
+            on_close=self.open_settings_hub,
             mostrar_cartas=self.mostrar_cartas_al_inicio,
             on_preview_change=self.set_card_preview,
         )
+
+    def open_screen_settings(self):
+        """Abre la ventana modal de ajustes de pantalla (modo ventana o pantalla completa adaptativa)."""
+        self.active_modal = ScreenSettingsModal(
+            screen_size=(self.screen_width, self.screen_height),
+            is_fullscreen=self.is_fullscreen,
+            on_save_and_exit=self.on_screen_settings_saved,
+        )
+
+    def on_screen_settings_saved(self, new_fullscreen: bool):
+        """Aplica el nuevo modo de pantalla, persiste en JSON y regresa al menú de ajustes."""
+        if new_fullscreen != self.is_fullscreen:
+            self.is_fullscreen = new_fullscreen
+            self.apply_display_mode()
+        self._save_display_config()
+        self.open_settings_hub()
 
     def set_card_preview(self, enabled: bool):
         self.mostrar_cartas_al_inicio = enabled
 
     def quit_game(self):
-        """Cierra la aplicación de forma limpia y asegura el guardado de configuración JSON."""
+        """Cierra la aplicación de forma limpia y asegura el guardado de configuraciones JSON."""
         try:
             self.sound.save_config()
+            self._save_display_config()
         except Exception:
             pass
         self.is_running = False

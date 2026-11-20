@@ -4,6 +4,8 @@ Fundamentos Teóricos de Informática - UNPSJB - Grupo N°2 (2026)
 Integrantes: Alexis Mariqueo, Cesar Millavanque, Daniel Enegron, Kadir Martinez
 """
 
+import json
+import os
 import sys
 import pygame
 from game_manager import GameManager
@@ -15,7 +17,21 @@ def main():
     pygame.display.set_caption("Juego de la Memoria (Memotest) - FTI Grupo N°2")
 
     window_size = (1280, 720)
-    screen = pygame.display.set_mode(window_size)
+
+    # Cargar preferencia de pantalla completa desde display_settings.json si existe
+    is_fullscreen = False
+    try:
+        if os.path.exists("display_settings.json"):
+            with open("display_settings.json", "r", encoding="utf-8") as f:
+                is_fullscreen = json.load(f).get("fullscreen", False)
+    except Exception:
+        pass
+
+    flags = pygame.SCALED
+    if is_fullscreen:
+        flags |= pygame.FULLSCREEN
+
+    screen = pygame.display.set_mode(window_size, flags)
     clock = pygame.time.Clock()
 
     # Intentar cargar ícono de la ventana desde los assets si está disponible
@@ -51,12 +67,16 @@ def main():
                 break
 
         game_manager.update(dt)
-        game_manager.draw(screen)
+
+        # Obtener la superficie de pantalla activa (soporta cambios dinámicos ventana/fullscreen)
+        current_screen = pygame.display.get_surface() or screen
+        game_manager.draw(current_screen)
         pygame.display.flip()
 
-    # Guardar configuración de audio al salir
+    # Guardar configuración de audio y pantalla al salir
     try:
         game_manager.sound.save_config()
+        game_manager._save_display_config()
     except Exception:
         pass
 
