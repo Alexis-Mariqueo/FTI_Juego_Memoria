@@ -6,12 +6,16 @@ Incluye control completo de volumen y silenciamiento (mute).
 """
 
 import io
+import json
 import math
 import os
 import struct
 import wave
 from typing import Dict, Optional
 import pygame
+
+
+CONFIG_FILE = "sound_settings.json"
 
 
 def find_audio_file(filename: str) -> Optional[str]:
@@ -29,7 +33,8 @@ def find_audio_file(filename: str) -> Optional[str]:
 class SoundManager:
     """Manejador integral de música y efectos de sonido."""
 
-    def __init__(self, enabled: bool = True):
+    def __init__(self, enabled: bool = True, config_path: str = CONFIG_FILE):
+        self.config_path = config_path
         self.enabled = enabled
         self.music_volume: float = 0.5  # 0.0 a 1.0
         self.sfx_volume: float = 0.7    # 0.0 a 1.0
@@ -42,7 +47,43 @@ class SoundManager:
         self.menu_music_path = find_audio_file("menu_principal.mp3")
         self.game_music_path = find_audio_file("juego_principal.mp3")
 
+        # Cargar configuración desde JSON si existe, o crearla con valores por defecto
+        self.load_config()
+
         self._init_mixer()
+
+    def load_config(self):
+        """Carga la configuración de volumen y silencio desde un archivo JSON."""
+        if os.path.exists(self.config_path):
+            try:
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self.music_volume = max(0.0, min(1.0, float(data.get("music_volume", self.music_volume))))
+                    self.sfx_volume = max(0.0, min(1.0, float(data.get("sfx_volume", self.sfx_volume))))
+                    self.music_muted = bool(data.get("music_muted", self.music_muted))
+                    self.sfx_muted = bool(data.get("sfx_muted", self.sfx_muted))
+                    if "sound_enabled" in data:
+                        self.enabled = bool(data["sound_enabled"])
+            except Exception as e:
+                print(f"Aviso: Error al leer {self.config_path}: {e}")
+                self.save_config()
+        else:
+            self.save_config()
+
+    def save_config(self):
+        """Guarda la configuración actual de audio en el archivo JSON."""
+        try:
+            data = {
+                "music_volume": round(self.music_volume, 2),
+                "sfx_volume": round(self.sfx_volume, 2),
+                "music_muted": self.music_muted,
+                "sfx_muted": self.sfx_muted,
+                "sound_enabled": self.enabled,
+            }
+            with open(self.config_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print(f"Error al guardar configuración de audio en {self.config_path}: {e}")
 
     def _init_mixer(self):
         try:
@@ -208,41 +249,43 @@ class SoundManager:
             pass
 
     def set_music_volume(self, vol: float):
-        """Establece el volumen de música (0.0 a 1.0)."""
+        """Establece el volumen de música (0.0 a 1.0) y guarda en config JSON."""
         self.music_volume = max(0.0, min(1.0, round(vol, 2)))
         self._apply_volumes()
+        self.save_config()
 
     def set_sfx_volume(self, vol: float):
-        """Establece el volumen de efectos de sonido (0.0 a 1.0)."""
+        """Establece el volumen de efectos de sonido (0.0 a 1.0) y guarda en config JSON."""
         self.sfx_volume = max(0.0, min(1.0, round(vol, 2)))
         self._apply_volumes()
+        self.save_config()
 
     def change_music_volume(self, delta: float):
         """Aumenta o disminuye el volumen de música en un paso (ej: +0.1 o -0.1)."""
         new_vol = self.music_volume + delta
-        self.set_music_volume(new_vol)
         if self.music_muted and delta > 0:
             self.music_muted = False
-            self._apply_volumes()
+        self.set_music_volume(new_vol)
 
     def change_sfx_volume(self, delta: float):
         """Aumenta o disminuye el volumen de efectos en un paso."""
         new_vol = self.sfx_volume + delta
-        self.set_sfx_volume(new_vol)
         if self.sfx_muted and delta > 0:
             self.sfx_muted = False
-            self._apply_volumes()
+        self.set_sfx_volume(new_vol)
 
     def toggle_music_mute(self) -> bool:
-        """Alterna el silencio de la música."""
+        """Alterna el silencio de la música y guarda en config JSON."""
         self.music_muted = not self.music_muted
         self._apply_volumes()
+        self.save_config()
         return self.music_muted
 
     def toggle_sfx_mute(self) -> bool:
-        """Alterna el silencio de los efectos de sonido."""
+        """Alterna el silencio de los efectos de sonido y guarda en config JSON."""
         self.sfx_muted = not self.sfx_muted
         self._apply_volumes()
+        self.save_config()
         return self.sfx_muted
 
     # ==================== CONTROL DE EFECTOS (SFX) ====================

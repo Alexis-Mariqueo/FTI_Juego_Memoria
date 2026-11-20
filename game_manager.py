@@ -20,7 +20,17 @@ from ui_components import (
     SoundSettingsModal,
     StackVisualizer,
     WordHistoryView,
+    draw_cozy_panel,
     get_font,
+    COZY_GREEN_SAGE,
+    COZY_GREEN_HOVER,
+    COZY_TERRACOTTA,
+    COZY_TERRACOTTA_HOVER,
+    COZY_AMBER,
+    COZY_AMBER_HOVER,
+    COZY_SLATE_PURPLE,
+    COZY_SLATE_PURPLE_HOVER,
+    COZY_TEXT_GOLD,
 )
 
 # Estados generales de la aplicación
@@ -49,14 +59,14 @@ class GameManager:
         self.total_matches = 0
         self.total_invalids = 0
         self.status_message = "Selecciona dos cartas para buscar una coincidencia."
-        self.status_message_color = (200, 215, 235)
+        self.status_message_color = (244, 232, 222)
 
         # Cartas y tablero
         self.cards: List[Card] = []
         self.first_selected: Optional[Card] = None
         self.second_selected: Optional[Card] = None
         self.mismatch_wait_timer: float = 0.0
-        self.preview_time_remaining: Optional[float]= None
+        self.preview_time_remaining: Optional[float] = None
 
         # Autómatas y audio
         self.automata = AutomataGameController(pairs_count=4)
@@ -66,7 +76,12 @@ class GameManager:
         # Iniciar música del menú principal
         self.sound.play_menu_music()
 
-        # Recursos gráficos
+        # Fondos Pixel Art acogedores
+        self.menu_bg: Optional[pygame.Surface] = None
+        self.game_bg: Optional[pygame.Surface] = None
+        self._load_backgrounds()
+
+        # Recursos gráficos de cartas
         self.front_images: Dict[str, pygame.Surface] = {}
         self.back_image: Optional[pygame.Surface] = None
         self._load_card_assets()
@@ -77,7 +92,7 @@ class GameManager:
         self.dfa_view = DFAGraphVisualizer(pygame.Rect(820, 244, 440, 98))
         self.stack_view = StackVisualizer(pygame.Rect(820, 352, 440, 206))
         
-        # Botones HUD en juego (4 botones compactos)
+        # Botones HUD en juego (4 botones compactos con estética pixel art cozy)
         btn_y = 568
         btn_w = 102
         gap = 10
@@ -85,32 +100,32 @@ class GameManager:
             pygame.Rect(820, btn_y, btn_w, 40),
             "Reiniciar",
             callback=self.restart_current_game,
-            bg_color=(39, 174, 96),
-            hover_color=(46, 204, 113),
+            bg_color=COZY_GREEN_SAGE,
+            hover_color=COZY_GREEN_HOVER,
             font_size=13,
         )
         self.btn_menu = Button(
             pygame.Rect(820 + btn_w + gap, btn_y, btn_w, 40),
             "Menú",
             callback=self.go_to_menu,
-            bg_color=(41, 128, 185),
-            hover_color=(52, 152, 219),
+            bg_color=COZY_SLATE_PURPLE,
+            hover_color=COZY_SLATE_PURPLE_HOVER,
             font_size=13,
         )
         self.btn_hud_sound = Button(
             pygame.Rect(820 + (btn_w + gap) * 2, btn_y, btn_w, 40),
-            "Sonido",
+            "Ajuste Sonido",
             callback=self.open_sound_settings,
-            bg_color=(230, 126, 34),
-            hover_color=(243, 156, 18),
-            font_size=13,
+            bg_color=COZY_AMBER,
+            hover_color=COZY_AMBER_HOVER,
+            font_size=12,
         )
         self.btn_theory = Button(
             pygame.Rect(820 + (btn_w + gap) * 3, btn_y, btn_w, 40),
             "Teoría FTI",
             callback=self.show_theoretical_info,
-            bg_color=(142, 68, 173),
-            hover_color=(155, 89, 182),
+            bg_color=COZY_TERRACOTTA,
+            hover_color=COZY_TERRACOTTA_HOVER,
             font_size=13,
         )
 
@@ -119,6 +134,27 @@ class GameManager:
 
         # Componentes del Menú Principal
         self._init_menu_components()
+
+    def _load_backgrounds(self):
+        """Carga y adapta los fondos en pixel art para el menú y el juego."""
+        menu_path = os.path.join("assets", "backgrounds", "menu_bg.png")
+        game_path = os.path.join("assets", "backgrounds", "game_bg.png")
+
+        try:
+            if os.path.exists(menu_path):
+                img = pygame.image.load(menu_path).convert()
+                self.menu_bg = pygame.transform.scale(img, (self.screen_width, self.screen_height))
+        except Exception as e:
+            print(f"Aviso: No se pudo cargar menu_bg.png: {e}")
+            self.menu_bg = None
+
+        try:
+            if os.path.exists(game_path):
+                img = pygame.image.load(game_path).convert()
+                self.game_bg = pygame.transform.scale(img, (self.screen_width, self.screen_height))
+        except Exception as e:
+            print(f"Aviso: No se pudo cargar game_bg.png: {e}")
+            self.game_bg = None
 
     def _load_card_assets(self):
         """Carga las imágenes de las cartas desde la carpeta assets/cartas."""
@@ -177,8 +213,8 @@ class GameManager:
             rect=pygame.Rect(center_x - 220, 424, 440, 48),
             text="INICIAR PARTIDA",
             callback=self.start_game,
-            bg_color=(39, 174, 96),
-            hover_color=(46, 204, 113),
+            bg_color=COZY_GREEN_SAGE,
+            hover_color=COZY_GREEN_HOVER,
             font_size=18,
             border_radius=10,
         )
@@ -186,10 +222,10 @@ class GameManager:
         # Fila 2: Botón de Sonido y Botón de Fundamentos Teóricos
         self.btn_sound = Button(
             rect=pygame.Rect(center_x - 220, 484, 215, 42),
-            text="Ajustes",
+            text="Ajuste de Sonido",
             callback=self.open_sound_settings,
-            bg_color=(41, 128, 185),
-            hover_color=(52, 152, 219),
+            bg_color=COZY_AMBER,
+            hover_color=COZY_AMBER_HOVER,
             font_size=14,
             border_radius=8,
         )
@@ -198,8 +234,8 @@ class GameManager:
             rect=pygame.Rect(center_x + 5, 484, 215, 42),
             text="Fundamentos Teóricos",
             callback=self.show_theoretical_info,
-            bg_color=(142, 68, 173),
-            hover_color=(155, 89, 182),
+            bg_color=COZY_SLATE_PURPLE,
+            hover_color=COZY_SLATE_PURPLE_HOVER,
             font_size=14,
             border_radius=8,
         )
@@ -209,8 +245,8 @@ class GameManager:
             rect=pygame.Rect(center_x - 220, 538, 440, 38),
             text="Salir del Juego",
             callback=self.quit_game,
-            bg_color=(192, 57, 43),
-            hover_color=(231, 76, 60),
+            bg_color=COZY_TERRACOTTA,
+            hover_color=COZY_TERRACOTTA_HOVER,
             font_size=14,
             border_radius=8,
         )
@@ -229,7 +265,11 @@ class GameManager:
         self.mostrar_cartas_al_inicio = enabled
 
     def quit_game(self):
-        """Cierra la aplicación de forma limpia."""
+        """Cierra la aplicación de forma limpia y asegura el guardado de configuración JSON."""
+        try:
+            self.sound.save_config()
+        except Exception:
+            pass
         self.is_running = False
         pygame.event.post(pygame.event.Event(pygame.QUIT))
 
@@ -481,7 +521,7 @@ class GameManager:
                 ("Jugar Otra Vez", self.start_game),
                 ("Menú Principal", self.go_to_menu),
             ],
-            title_color=(46, 204, 113),
+            title_color=COZY_GREEN_SAGE,
         )
 
     def _handle_defeat_by_errors(self):
@@ -511,7 +551,7 @@ class GameManager:
                 ("Reintentar", self.start_game),
                 ("Menú Principal", self.go_to_menu),
             ],
-            title_color=(231, 76, 60),
+            title_color=COZY_TERRACOTTA,
         )
 
     def _handle_defeat_by_time(self):
@@ -540,7 +580,7 @@ class GameManager:
                 ("Reintentar", self.start_game),
                 ("Menú Principal", self.go_to_menu),
             ],
-            title_color=(231, 76, 60),
+            title_color=COZY_TERRACOTTA,
         )
 
     def show_theoretical_info(self):
@@ -566,7 +606,7 @@ class GameManager:
             buttons=[
                 ("Entendido / Volver", lambda: setattr(self, "active_modal", None)),
             ],
-            title_color=(241, 196, 15),
+            title_color=COZY_TEXT_GOLD,
         )
 
     def update(self, dt: float):
@@ -609,9 +649,7 @@ class GameManager:
                     self.second_selected = None
 
     def draw(self, surface: pygame.Surface):
-        """Renderiza la pantalla activa."""
-        surface.fill((16, 20, 30))
-
+        """Renderiza la pantalla activa con fondos pixel art y paneles cozy."""
         if self.state == STATE_MENU:
             self._draw_menu(surface)
         else:
@@ -622,50 +660,62 @@ class GameManager:
             self.active_modal.draw(surface)
 
     def _draw_menu(self, surface: pygame.Surface):
-        """Dibuja la pantalla inicial del menú."""
+        """Dibuja la pantalla inicial del menú con fondo pixel art cozy y paneles cálidos."""
+        if self.menu_bg:
+            surface.blit(self.menu_bg, (0, 0))
+            # Velo ambiental cálido translúcido para asegurar máxima legibilidad y ambiente acogedor
+            dim_overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
+            dim_overlay.fill((30, 20, 26, 120))
+            surface.blit(dim_overlay, (0, 0))
+        else:
+            surface.fill((40, 30, 38))
+
         center_x = self.screen_width // 2
 
+        # Panel contenedor central del menú estilo tarjeta cálida selective outline
+        menu_box = pygame.Rect(center_x - 320, 35, 640, 650)
+        draw_cozy_panel(surface, menu_box, border_radius=16, bg_color=(44, 34, 42), border_color=(92, 72, 80), alpha=235)
+
         # Cabecera Institucional
-        font_sub = get_font(13, bold=False)
+        font_sub = get_font(12, bold=False)
         sub_surf = font_sub.render(
             "UNIVERSIDAD NACIONAL DE LA PATAGONIA SAN JUAN BOSCO — FUNDAMENTOS TEÓRICOS DE INFORMÁTICA",
             True,
-            (140, 160, 190),
+            (215, 195, 185),
         )
-        surface.blit(sub_surf, sub_surf.get_rect(center=(center_x, 60)))
+        surface.blit(sub_surf, sub_surf.get_rect(center=(center_x, 62)))
 
         # Título Principal
-        font_title = get_font(38, bold=True)
-        title_surf = font_title.render("JUEGO DE LA MEMORIA (MEMOTEST)", True, (236, 240, 241))
-        surface.blit(title_surf, title_surf.get_rect(center=(center_x, 110)))
+        font_title = get_font(35, bold=True)
+        title_surf = font_title.render("JUEGO DE LA MEMORIA (MEMOTEST)", True, COZY_TEXT_GOLD)
+        surface.blit(title_surf, title_surf.get_rect(center=(center_x, 104)))
 
         # Subtítulo de Autómatas
-        font_model = get_font(16, bold=True)
+        font_model = get_font(14, bold=True)
         model_surf = font_model.render(
             "Modelado Formal mediante Autómata Finito Determinista (AFD) y Autómata de Pila (AP)",
             True,
-            (52, 152, 219),
+            (245, 195, 165),
         )
-        surface.blit(model_surf, model_surf.get_rect(center=(center_x, 150)))
+        surface.blit(model_surf, model_surf.get_rect(center=(center_x, 140)))
 
         # Cuadro de Integrantes (Grupo N°2)
-        group_rect = pygame.Rect(center_x - 300, 185, 600, 70)
-        pygame.draw.rect(surface, (23, 28, 42), group_rect, border_radius=10)
-        pygame.draw.rect(surface, (45, 55, 78), group_rect, width=1, border_radius=10)
+        group_rect = pygame.Rect(center_x - 280, 168, 560, 68)
+        draw_cozy_panel(surface, group_rect, border_radius=10, bg_color=(52, 40, 48), border_color=(98, 76, 86), alpha=240)
 
-        g_title = get_font(13, bold=True).render("GRUPO N°2 (2026):", True, (241, 196, 15))
-        surface.blit(g_title, g_title.get_rect(center=(center_x, 205)))
+        g_title = get_font(13, bold=True).render("GRUPO N°2 (2026):", True, COZY_TEXT_GOLD)
+        surface.blit(g_title, g_title.get_rect(center=(center_x, 186)))
 
         members = "Alexis Mariqueo  •  Cesar Millavanque  •  Daniel Enegron  •  Kadir Martinez"
-        m_surf = get_font(14, bold=False).render(members, True, (210, 225, 245))
-        surface.blit(m_surf, m_surf.get_rect(center=(center_x, 230)))
+        m_surf = get_font(14, bold=False).render(members, True, (244, 235, 226))
+        surface.blit(m_surf, m_surf.get_rect(center=(center_x, 212)))
 
         # Etiquetas de selectores
-        lbl_diff = get_font(15, bold=True).render("Selecciona la Dificultad del Tablero:", True, (220, 230, 242))
+        lbl_diff = get_font(14, bold=True).render("Selecciona la Dificultad del Tablero:", True, (250, 240, 230))
         surface.blit(lbl_diff, (center_x - 220, 252))
         self.diff_selector.draw(surface)
 
-        lbl_time = get_font(15, bold=True).render("Selecciona el Modo de Tiempo:", True, (220, 230, 242))
+        lbl_time = get_font(14, bold=True).render("Selecciona el Modo de Tiempo:", True, (250, 240, 230))
         surface.blit(lbl_time, (center_x - 220, 332))
         self.time_selector.draw(surface)
 
@@ -676,14 +726,22 @@ class GameManager:
         self.btn_quit.draw(surface)
 
     def _draw_game_screen(self, surface: pygame.Surface):
-        """Dibuja la pantalla de juego con el tablero y el panel de autómatas."""
+        """Dibuja la pantalla de juego con fondo pixel art, tablero y panel de autómatas."""
+        if self.game_bg:
+            surface.blit(self.game_bg, (0, 0))
+            # Velo ambiental translúcido suave
+            dim_overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
+            dim_overlay.fill((28, 18, 24, 115))
+            surface.blit(dim_overlay, (0, 0))
+        else:
+            surface.fill((40, 30, 38))
+
         # 1. Barra superior
         self._draw_top_bar(surface)
 
-        # 2. Área del tablero de cartas
+        # 2. Área del tablero de cartas con panel cálido selective outline
         board_panel = pygame.Rect(20, 80, 780, 620)
-        pygame.draw.rect(surface, (21, 26, 38), board_panel, border_radius=12)
-        pygame.draw.rect(surface, (40, 50, 72), board_panel, width=1, border_radius=12)
+        draw_cozy_panel(surface, board_panel, border_radius=12, bg_color=(42, 32, 40), border_color=(88, 68, 76), alpha=235)
 
         # Dibujar cada carta
         for c in self.cards:
@@ -720,39 +778,37 @@ class GameManager:
 
         # 8. Barra de mensaje de estado
         msg_panel = pygame.Rect(820, 620, 440, 45)
-        pygame.draw.rect(surface, (23, 28, 42), msg_panel, border_radius=8)
-        pygame.draw.rect(surface, (45, 55, 78), msg_panel, width=1, border_radius=8)
+        draw_cozy_panel(surface, msg_panel, border_radius=8, bg_color=(46, 36, 44), border_color=(90, 70, 78), alpha=240)
 
         msg_font = get_font(12, bold=True)
         msg_surf = msg_font.render(self.status_message, True, self.status_message_color)
         surface.blit(msg_surf, msg_surf.get_rect(center=msg_panel.center))
 
     def _draw_top_bar(self, surface: pygame.Surface):
-        """Barra de encabezado superior."""
+        """Barra de encabezado superior con diseño cozy cálido."""
         header_rect = pygame.Rect(0, 0, self.screen_width, 60)
-        pygame.draw.rect(surface, (23, 28, 42), header_rect)
-        pygame.draw.line(surface, (45, 55, 78), (0, 60), (self.screen_width, 60), 2)
+        draw_cozy_panel(surface, header_rect, border_radius=0, bg_color=(42, 32, 40), border_color=(84, 65, 74), alpha=245)
+        pygame.draw.line(surface, (98, 76, 86), (0, 60), (self.screen_width, 60), 2)
 
         title_font = get_font(20, bold=True)
-        title_surf = title_font.render("Juego de la Memoria (Memotest)", True, (236, 240, 241))
+        title_surf = title_font.render("Juego de la Memoria (Memotest)", True, COZY_TEXT_GOLD)
         surface.blit(title_surf, (24, 18))
 
         sub_font = get_font(13, bold=False)
         sub_text = "FTI - UNPSJB | Grupo N°2 (A. Mariqueo, C. Millavanque, D. Enegron, K. Martinez)"
-        sub_surf = sub_font.render(sub_text, True, (140, 160, 190))
+        sub_surf = sub_font.render(sub_text, True, (215, 195, 185))
         surface.blit(sub_surf, (self.screen_width - sub_surf.get_width() - 24, 22))
 
     def _draw_hud(self, surface: pygame.Surface):
-        """Dibuja el panel con Puntaje, Tiempo y Vidas."""
-        pygame.draw.rect(surface, (23, 28, 42), self.hud_rect, border_radius=10)
-        pygame.draw.rect(surface, (45, 55, 78), self.hud_rect, width=1, border_radius=10)
+        """Dibuja el panel con Puntaje, Tiempo y Vidas con estética pastel cálida."""
+        draw_cozy_panel(surface, self.hud_rect, border_radius=10, bg_color=(46, 36, 44), border_color=(90, 70, 78), alpha=240)
 
         # 1. Puntaje
         lbl_font = get_font(12, bold=False)
         val_font = get_font(20, bold=True)
 
-        lbl_score = lbl_font.render("PUNTAJE", True, (140, 155, 180))
-        val_score = val_font.render(f"{self.score} pts", True, (241, 196, 15))
+        lbl_score = lbl_font.render("PUNTAJE", True, (200, 180, 172))
+        val_score = val_font.render(f"{self.score} pts", True, COZY_TEXT_GOLD)
         surface.blit(lbl_score, (self.hud_rect.x + 18, self.hud_rect.y + 12))
         surface.blit(val_score, (self.hud_rect.x + 18, self.hud_rect.y + 34))
 
@@ -760,16 +816,20 @@ class GameManager:
         mins = int(self.time_remaining // 60)
         secs = int(self.time_remaining % 60)
         time_str = f"{mins:02d}:{secs:02d}"
-        time_col = (231, 76, 60) if self.time_remaining <= 60 else (52, 152, 219)
+        time_col = COZY_TERRACOTTA if self.time_remaining <= 60 else (138, 188, 218)
 
-        lbl_time = lbl_font.render("TIEMPO", True, (140, 155, 180))
+        lbl_time = lbl_font.render("TIEMPO", True, (200, 180, 172))
         val_time = val_font.render(time_str, True, time_col)
         surface.blit(lbl_time, (self.hud_rect.x + 160, self.hud_rect.y + 12))
         surface.blit(val_time, (self.hud_rect.x + 160, self.hud_rect.y + 34))
 
         # 3. Vidas Restantes
-        lbl_lives = lbl_font.render("VIDAS (PILA)", True, (140, 155, 180))
-        val_lives = val_font.render(f"{self.automata.lives} / 5", True, (46, 204, 113) if self.automata.lives > 1 else (231, 76, 60))
+        lbl_lives = lbl_font.render("VIDAS (PILA)", True, (200, 180, 172))
+        val_lives = val_font.render(
+            f"{self.automata.lives} / 5",
+            True,
+            COZY_GREEN_SAGE if self.automata.lives > 1 else COZY_TERRACOTTA,
+        )
         surface.blit(lbl_lives, (self.hud_rect.x + 300, self.hud_rect.y + 12))
         surface.blit(val_lives, (self.hud_rect.x + 300, self.hud_rect.y + 34))
 

@@ -54,6 +54,12 @@ def main():
         game_manager.draw(screen)
         pygame.display.flip()
 
+    # Guardar configuración de audio al salir
+    try:
+        game_manager.sound.save_config()
+    except Exception:
+        pass
+
     pygame.quit()
     sys.exit(0)
 
