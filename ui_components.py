@@ -276,95 +276,301 @@ class DFAGraphVisualizer:
 
 
 class StackVisualizer:
-    """Visualizador interactivo de la Pila del Autómata de Pila (AP) con estética cálida."""
+    """Visualizador interactivo de los Autómatas de Pila (AP): Control de Vidas y Control de Tiempo."""
 
     def __init__(self, rect: pygame.Rect):
         self.rect = rect
-        self.title_font = get_font(15, bold=True)
-        self.elem_font = get_font(14, bold=True)
-        self.info_font = get_font(12, bold=False)
+        self.title_font = get_font(14, bold=True)
+        self.sub_title_font = get_font(12, bold=True)
+        self.elem_font = get_font(13, bold=True)
+        self.elem_small_font = get_font(10, bold=True)
+        self.info_font = get_font(11, bold=False)
+        self.tab_font = get_font(11, bold=True)
+        self.current_tab: str = "ambas"  # 'ambas', 'vidas', 'tiempo'
+
+        tab_y = self.rect.y + 7
+        self.tab_rect_ambas = pygame.Rect(self.rect.right - 210, tab_y, 62, 22)
+        self.tab_rect_vidas = pygame.Rect(self.rect.right - 144, tab_y, 62, 22)
+        self.tab_rect_tiempo = pygame.Rect(self.rect.right - 78, tab_y, 68, 22)
+
+    def handle_event(self, event: pygame.event.Event) -> bool:
+        """Permite alternar entre la vista combinada y vistas detalladas de cada pila."""
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.tab_rect_ambas.collidepoint(event.pos):
+                self.current_tab = "ambas"
+                return True
+            elif self.tab_rect_vidas.collidepoint(event.pos):
+                self.current_tab = "vidas"
+                return True
+            elif self.tab_rect_tiempo.collidepoint(event.pos):
+                self.current_tab = "tiempo"
+                return True
+        return False
 
     def draw(
         self,
         surface: pygame.Surface,
-        stack: List[str],
-        pda_state: str,
-        lives: int,
-        last_transition: str,
+        lives_stack: Optional[List[str]] = None,
+        lives_state: str = "q1",
+        lives: int = 5,
+        lives_transition: str = "λ, Z ; VVVVVZ",
+        time_stack: Optional[List[str]] = None,
+        time_state: str = "q1",
+        minutes_left: int = 5,
+        total_minutes: int = 5,
+        time_transition: str = "λ, Z ; MMMMMZ",
+        # Compatibilidad con firma anterior
+        stack: Optional[List[str]] = None,
+        pda_state: Optional[str] = None,
+        last_transition: Optional[str] = None,
     ):
+        # Soporte para llamadas previas
+        if stack is not None and lives_stack is None:
+            lives_stack = stack
+        if pda_state is not None:
+            lives_state = pda_state
+        if last_transition is not None:
+            lives_transition = last_transition
+        if lives_stack is None:
+            lives_stack = ["Z", "V", "V", "V", "V", "V"]
+        if time_stack is None:
+            time_stack = ["Z"] + ["M"] * total_minutes
+
         draw_cozy_panel(surface, self.rect, border_radius=10, bg_color=(46, 36, 44), border_color=(90, 70, 78))
 
-        # Cabecera
-        title_surf = self.title_font.render("AP: Autómata de Pila (Vidas)", True, COZY_TEXT_GOLD)
+        # 1. Cabecera con Título y Pestañas interactivas
+        title_surf = self.title_font.render("AUTÓMATAS DE PILA (AP)", True, COZY_TEXT_GOLD)
         surface.blit(title_surf, (self.rect.x + 14, self.rect.y + 10))
 
-        # Indicador de estado del AP
-        st_color = (212, 112, 100) if pda_state == "q2" else (138, 178, 198)
-        state_badge = self.info_font.render(f"Estado: {pda_state} | Vidas: {lives}/5", True, st_color)
-        surface.blit(state_badge, (self.rect.right - state_badge.get_width() - 14, self.rect.y + 12))
+        # Pestañas
+        tabs = [
+            (self.tab_rect_ambas, "Ambas", self.current_tab == "ambas"),
+            (self.tab_rect_vidas, "Vidas", self.current_tab == "vidas"),
+            (self.tab_rect_tiempo, "Tiempo", self.current_tab == "tiempo"),
+        ]
+        for t_rect, t_name, is_sel in tabs:
+            bg_col = (72, 54, 64) if is_sel else (52, 40, 48)
+            border_col = (145, 115, 128) if is_sel else (82, 64, 72)
+            txt_col = COZY_TEXT_GOLD if is_sel else (205, 190, 180)
+            pygame.draw.rect(surface, bg_col, t_rect, border_radius=5)
+            pygame.draw.rect(surface, border_col, t_rect, width=1, border_radius=5)
+            t_surf = self.tab_font.render(t_name, True, txt_col)
+            surface.blit(t_surf, t_surf.get_rect(center=t_rect.center))
 
-        # Contenedor de la pila vertical
-        box_w = 120
-        box_h = 160
-        box_x = self.rect.x + 20
-        box_y = self.rect.y + 38
+        # Separador superior
+        sep_y = self.rect.y + 34
+        pygame.draw.line(surface, (84, 65, 74), (self.rect.x + 12, sep_y), (self.rect.right - 12, sep_y), 1)
 
-        # Soporte con textura cálida selective outline
+        # 2. Render según la pestaña activa
+        if self.current_tab == "ambas":
+            self._draw_dual_view(
+                surface,
+                lives_stack=lives_stack,
+                lives_state=lives_state,
+                lives=lives,
+                lives_transition=lives_transition,
+                time_stack=time_stack,
+                time_state=time_state,
+                minutes_left=minutes_left,
+                total_minutes=total_minutes,
+                time_transition=time_transition,
+            )
+        elif self.current_tab == "vidas":
+            self._draw_single_lives_view(
+                surface,
+                lives_stack=lives_stack,
+                lives_state=lives_state,
+                lives=lives,
+                lives_transition=lives_transition,
+            )
+        else:
+            self._draw_single_time_view(
+                surface,
+                time_stack=time_stack,
+                time_state=time_state,
+                minutes_left=minutes_left,
+                total_minutes=total_minutes,
+                time_transition=time_transition,
+            )
+
+    def _draw_beaker(
+        self,
+        surface: pygame.Surface,
+        box_x: int,
+        box_y: int,
+        box_w: int,
+        box_h: int,
+        stack: List[str],
+        sym_type: str,  # 'V' o 'M'
+    ):
+        """Dibuja un vaso contenedor de pila vertical con elementos apilados y flecha TOPE."""
         wall_col = (118, 92, 102)
-        pygame.draw.line(surface, wall_col, (box_x, box_y), (box_x, box_y + box_h), width=3)
-        pygame.draw.line(surface, wall_col, (box_x + box_w, box_y), (box_x + box_w, box_y + box_h), width=3)
-        pygame.draw.line(surface, wall_col, (box_x - 3, box_y + box_h), (box_x + box_w + 3, box_y + box_h), width=4)
-
-        elem_h = 22
-        start_y = box_y + box_h - elem_h - 4
+        pygame.draw.line(surface, wall_col, (box_x, box_y), (box_x, box_y + box_h), width=2)
+        pygame.draw.line(surface, wall_col, (box_x + box_w, box_y), (box_x + box_w, box_y + box_h), width=2)
+        pygame.draw.line(surface, wall_col, (box_x - 2, box_y + box_h), (box_x + box_w + 2, box_y + box_h), width=3)
 
         if not stack:
-            empty_msg = self.elem_font.render("[ PILA VACÍA ]", True, (212, 112, 100))
+            empty_msg = self.elem_small_font.render("PILA VACÍA", True, (218, 118, 106))
             surface.blit(empty_msg, empty_msg.get_rect(center=(box_x + box_w // 2, box_y + box_h // 2)))
-        else:
-            for i, sym in enumerate(stack):
-                ey = start_y - (i * (elem_h + 3))
-                elem_rect = pygame.Rect(box_x + 6, ey, box_w - 12, elem_h)
+            return
 
-                if sym == "V":
-                    col = (128, 172, 132)  # Verde salvia pastel
-                    border_col = (168, 206, 172)
-                    txt = "V (Vida)"
-                else:
-                    col = (156, 122, 154)  # Malva ciruela suave para Z
-                    border_col = (186, 152, 184)
-                    txt = "Z (Fondo)"
+        # Altura dinámica por elemento para adaptarse a 5 o 10 minutos
+        n = max(len(stack), 1)
+        available_h = box_h - 8
+        elem_h = max(9, min(18, available_h // n - 2))
+        gap = 2 if elem_h >= 12 else 1
+        start_y = box_y + box_h - elem_h - 4
 
-                pygame.draw.rect(surface, col, elem_rect, border_radius=4)
-                pygame.draw.rect(surface, border_col, elem_rect, width=1, border_radius=4)
+        for i, sym in enumerate(stack):
+            ey = start_y - (i * (elem_h + gap))
+            elem_rect = pygame.Rect(box_x + 4, ey, box_w - 8, elem_h)
 
-                elem_surf = self.elem_font.render(txt, True, (255, 252, 248))
-                surface.blit(elem_surf, elem_surf.get_rect(center=elem_rect.center))
+            if sym == "V":
+                col = (128, 172, 132)  # Verde salvia pastel
+                border_col = (168, 206, 172)
+                txt = "V (Vida)" if elem_h >= 15 else "V"
+            elif sym == "M":
+                col = (105, 162, 204)  # Azul cielo pastel cálido
+                border_col = (145, 195, 230)
+                txt = "M (Min)" if elem_h >= 15 else "M"
+            else:
+                col = (156, 122, 154)  # Malva ciruela suave para Z
+                border_col = (186, 152, 184)
+                txt = "Z (Fondo)" if elem_h >= 15 else "Z"
 
-                # Señalador de TOPE en el último elemento
-                if i == len(stack) - 1:
-                    arrow_x = box_x + box_w + 10
-                    arrow_y = ey + elem_h // 2
-                    top_label = self.info_font.render("TOPE", True, COZY_TEXT_GOLD)
-                    surface.blit(top_label, (arrow_x, arrow_y - 8))
+            pygame.draw.rect(surface, col, elem_rect, border_radius=3)
+            pygame.draw.rect(surface, border_col, elem_rect, width=1, border_radius=3)
 
-        # Panel explicativo al lado derecho de la pila
-        info_x = box_x + box_w + 80
-        info_y = box_y + 10
+            use_font = self.elem_font if elem_h >= 14 else self.elem_small_font
+            elem_surf = use_font.render(txt, True, (255, 252, 248))
+            surface.blit(elem_surf, elem_surf.get_rect(center=elem_rect.center))
 
-        desc_lines = [
-            "Condición: Aceptación por pila vacía",
-            f"Regla actual: {last_transition}",
-            f"Vidas activas: {lives}/5",
+            # Indicador TOPE en el último elemento
+            if i == len(stack) - 1:
+                arrow_x = box_x + box_w + 5
+                arrow_y = ey + elem_h // 2
+                top_label = self.elem_small_font.render("TOPE", True, COZY_TEXT_GOLD)
+                surface.blit(top_label, (arrow_x, arrow_y - 7))
+
+    def _draw_dual_view(
+        self,
+        surface: pygame.Surface,
+        lives_stack: List[str],
+        lives_state: str,
+        lives: int,
+        lives_transition: str,
+        time_stack: List[str],
+        time_state: str,
+        minutes_left: int,
+        total_minutes: int,
+        time_transition: str,
+    ):
+        """Muestra ambas pilas (Vidas y Tiempo) en columnas paralelas."""
+        # Separador vertical central
+        sep_x = self.rect.centerx
+        pygame.draw.line(surface, (72, 54, 62), (sep_x, self.rect.y + 40), (sep_x, self.rect.bottom - 8), 1)
+
+        # --- COLUMNA IZQUIERDA: AP VIDAS ---
+        left_center_x = (self.rect.x + sep_x) // 2
+        lbl_v = self.sub_title_font.render("AP 1: Vidas (Errores)", True, COZY_TEXT_GOLD)
+        surface.blit(lbl_v, lbl_v.get_rect(center=(left_center_x, self.rect.y + 47)))
+
+        st_col_v = (212, 112, 100) if lives_state == "q2" else (138, 178, 198)
+        badge_v = self.info_font.render(f"Estado: {lives_state} | Vidas: {lives}/5", True, st_col_v)
+        surface.blit(badge_v, badge_v.get_rect(center=(left_center_x, self.rect.y + 64)))
+
+        box_w = 78
+        box_h = 120
+        box_x_v = left_center_x - box_w // 2 - 12
+        box_y = self.rect.y + 78
+        self._draw_beaker(surface, box_x_v, box_y, box_w, box_h, lives_stack, sym_type="V")
+
+        regla_v = self.elem_small_font.render(f"Regla: {lives_transition[:24]}", True, (215, 195, 185))
+        surface.blit(regla_v, regla_v.get_rect(center=(left_center_x, self.rect.bottom - 14)))
+
+        # --- COLUMNA DERECHA: AP TIEMPO ---
+        right_center_x = (sep_x + self.rect.right) // 2
+        lbl_t = self.sub_title_font.render("AP 2: Tiempo (Minutos)", True, COZY_TEXT_GOLD)
+        surface.blit(lbl_t, lbl_t.get_rect(center=(right_center_x, self.rect.y + 47)))
+
+        st_col_t = (212, 112, 100) if time_state == "q2" else (105, 175, 215)
+        badge_t = self.info_font.render(f"Estado: {time_state} | Minutos: {minutes_left}/{total_minutes}", True, st_col_t)
+        surface.blit(badge_t, badge_t.get_rect(center=(right_center_x, self.rect.y + 64)))
+
+        box_x_t = right_center_x - box_w // 2 - 12
+        self._draw_beaker(surface, box_x_t, box_y, box_w, box_h, time_stack, sym_type="M")
+
+        regla_t = self.elem_small_font.render(f"Regla: {time_transition[:24]}", True, (215, 195, 185))
+        surface.blit(regla_t, regla_t.get_rect(center=(right_center_x, self.rect.bottom - 14)))
+
+    def _draw_single_lives_view(
+        self,
+        surface: pygame.Surface,
+        lives_stack: List[str],
+        lives_state: str,
+        lives: int,
+        lives_transition: str,
+    ):
+        """Vista ampliada con fundamentos del AP de Vidas."""
+        box_w = 95
+        box_h = 145
+        box_x = self.rect.x + 22
+        box_y = self.rect.y + 50
+        self._draw_beaker(surface, box_x, box_y, box_w, box_h, lives_stack, sym_type="V")
+
+        info_x = box_x + box_w + 50
+        info_y = box_y + 4
+
+        st_col = (212, 112, 100) if lives_state == "q2" else (138, 178, 198)
+        lines = [
+            ("AP: CONTROL DE ERRORES Y VIDAS", COZY_TEXT_GOLD, True),
+            (f"• Estado actual: {lives_state}  |  Vidas disponibles: {lives} / 5", st_col, False),
+            ("• Alfabeto de entrada: ΣE = {a, e, x}  |  Pila: ΣP = {Z, V}", (220, 205, 195), False),
+            ("• Carga inicial: λ, Z ; VVVVVZ (5 vidas)", (220, 205, 195), False),
+            ("• Cada error ('e') desapila una 'V' (e, V ; λ).", (220, 205, 195), False),
+            (f"• Última regla: {lives_transition}", COZY_TEXT_GOLD, False),
+            ("• Condición: Derrota por aceptación en PILA VACÍA (q2).", (240, 180, 170), False),
         ]
-        for line in desc_lines:
-            ln_surf = self.info_font.render(line, True, (222, 208, 198))
-            surface.blit(ln_surf, (info_x, info_y))
-            info_y += 24
+        for text, col, is_b in lines:
+            f = self.title_font if is_b else self.info_font
+            surf = f.render(text, True, col)
+            surface.blit(surf, (info_x, info_y))
+            info_y += 20
 
-        if pda_state == "q2" and not stack:
-            warn_surf = self.title_font.render("¡Pila Vacía alcanzada! DERROTA", True, (218, 118, 106))
-            surface.blit(warn_surf, (info_x, info_y + 6))
+    def _draw_single_time_view(
+        self,
+        surface: pygame.Surface,
+        time_stack: List[str],
+        time_state: str,
+        minutes_left: int,
+        total_minutes: int,
+        time_transition: str,
+    ):
+        """Vista ampliada con fundamentos del AP de Tiempo."""
+        box_w = 95
+        box_h = 145
+        box_x = self.rect.x + 22
+        box_y = self.rect.y + 50
+        self._draw_beaker(surface, box_x, box_y, box_w, box_h, time_stack, sym_type="M")
+
+        info_x = box_x + box_w + 50
+        info_y = box_y + 4
+
+        st_col = (212, 112, 100) if time_state == "q2" else (105, 175, 215)
+        lines = [
+            ("AP: CONTROL DE TIEMPO (MINUTOS)", COZY_TEXT_GOLD, True),
+            (f"• Estado actual: {time_state}  |  Minutos restantes: {minutes_left} / {total_minutes}", st_col, False),
+            ("• Alfabeto de entrada: ΣE = {t}  |  Pila: ΣP = {Z, M}", (220, 205, 195), False),
+            (f"• Carga inicial: λ, Z ; {'M'*total_minutes}Z ({total_minutes} minutos)", (220, 205, 195), False),
+            ("• Cada minuto transcurrido ('t') desapila una 'M' (t, M ; λ).", (220, 205, 195), False),
+            (f"• Última regla: {time_transition}", COZY_TEXT_GOLD, False),
+            ("• Condición: Derrota por tiempo al agotarse la pila en q2 (00:00).", (240, 180, 170), False),
+        ]
+        for text, col, is_b in lines:
+            f = self.title_font if is_b else self.info_font
+            surf = f.render(text, True, col)
+            surface.blit(surf, (info_x, info_y))
+            info_y += 20
 
 
 class WordHistoryView:

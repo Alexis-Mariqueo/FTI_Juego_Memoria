@@ -76,7 +76,8 @@ class GameManager:
         self.preview_time_remaining: Optional[float] = None
 
         # Autómatas y audio
-        self.automata = AutomataGameController(pairs_count=4)
+        self.minutes_elapsed: int = 0
+        self.automata = AutomataGameController(pairs_count=4, time_minutes=int(self.time_mode_seconds // 60))
         self.sound = SoundManager(enabled=True)
         self.is_running = True
 
@@ -99,17 +100,17 @@ class GameManager:
         self._load_card_assets()
 
         # Componentes UI de la pantalla de juego
-        self.hud_rect = pygame.Rect(820, 80, 440, 76)
-        self.word_view = WordHistoryView(pygame.Rect(820, 166, 440, 68))
-        self.dfa_view = DFAGraphVisualizer(pygame.Rect(820, 244, 440, 98))
-        self.stack_view = StackVisualizer(pygame.Rect(820, 352, 440, 206))
+        self.hud_rect = pygame.Rect(820, 72, 440, 70)
+        self.word_view = WordHistoryView(pygame.Rect(820, 148, 440, 64))
+        self.dfa_view = DFAGraphVisualizer(pygame.Rect(820, 218, 440, 96))
+        self.stack_view = StackVisualizer(pygame.Rect(820, 320, 440, 238))
         
         # Botones HUD en juego (4 botones compactos con estética pixel art cozy)
-        btn_y = 568
+        btn_y = 566
         btn_w = 102
         gap = 10
         self.btn_restart = Button(
-            pygame.Rect(820, btn_y, btn_w, 40),
+            pygame.Rect(820, btn_y, btn_w, 38),
             "Reiniciar",
             callback=self.restart_current_game,
             bg_color=COZY_GREEN_SAGE,
@@ -117,7 +118,7 @@ class GameManager:
             font_size=13,
         )
         self.btn_menu = Button(
-            pygame.Rect(820 + btn_w + gap, btn_y, btn_w, 40),
+            pygame.Rect(820 + btn_w + gap, btn_y, btn_w, 38),
             "Menú",
             callback=self.go_to_menu,
             bg_color=COZY_SLATE_PURPLE,
@@ -125,7 +126,7 @@ class GameManager:
             font_size=13,
         )
         self.btn_hud_sound = Button(
-            pygame.Rect(820 + (btn_w + gap) * 2, btn_y, btn_w, 40),
+            pygame.Rect(820 + (btn_w + gap) * 2, btn_y, btn_w, 38),
             "Ajustes",
             callback=self.open_settings_hub,
             bg_color=COZY_AMBER,
@@ -133,7 +134,7 @@ class GameManager:
             font_size=13,
         )
         self.btn_theory = Button(
-            pygame.Rect(820 + (btn_w + gap) * 3, btn_y, btn_w, 40),
+            pygame.Rect(820 + (btn_w + gap) * 3, btn_y, btn_w, 38),
             "Teoría FTI",
             callback=self.show_theoretical_info,
             bg_color=COZY_TERRACOTTA,
@@ -357,7 +358,9 @@ class GameManager:
     def start_game(self):
         """Prepara e inicia una nueva partida con la configuración elegida."""
         pairs_count = 4 if self.difficulty == "facil" else 8
-        self.automata.reset(pairs_count)
+        time_minutes = int(self.time_mode_seconds // 60)
+        self.automata.reset(pairs_count=pairs_count, time_minutes=time_minutes)
+        self.minutes_elapsed = 0
 
         self.score = 200
         self.time_remaining = self.time_mode_seconds
@@ -467,6 +470,8 @@ class GameManager:
             return
 
         if self.state == STATE_PLAYING:
+            if self.stack_view.handle_event(event):
+                return
             self.btn_restart.handle_event(event)
             self.btn_menu.handle_event(event)
             self.btn_hud_sound.handle_event(event)
@@ -643,17 +648,20 @@ class GameManager:
         lines = [
             f"## TIEMPO AGOTADO (00:00)",
             f"• El temporizador llegó a cero antes de completar el tablero.",
-            f"• Según las reglas del proyecto, el puntaje general pasa a ser 0.",
+            f"• El AP de Tiempo consumió todas las 'M' y desapiló 'Z' alcanzando el estado q2.",
+            f"• Condición de aceptación por PILA VACÍA cumplida en AP de Tiempo (Derrota formal).",
+            f"• Puntaje final: 0 puntos",
             f"• Pares descubiertos: {self.automata.pairs_found} / {self.automata.pairs_count}",
             f"• Errores cometidos: {self.total_errors}",
-            f"• Cadena procesada w: {self.automata.word_history}",
+            f"• Cadena de juego w: {self.automata.word_history if self.automata.word_history else '(ninguna)'}",
+            f"• Cadena de tiempo wt: {self.automata.time_word_history}",
         ]
 
         self.active_modal = ModalDialog(
-            width=620,
-            height=350,
+            width=640,
+            height=370,
             screen_size=(self.screen_width, self.screen_height),
-            title="TIEMPO AGOTADO",
+            title="TIEMPO AGOTADO (AP DERROTA)",
             content_lines=lines,
             buttons=[
                 ("Reintentar", self.start_game),
@@ -664,21 +672,25 @@ class GameManager:
 
     def show_theoretical_info(self):
         """Muestra el diálogo explicativo de los modelos teóricos y el equipo."""
+        t_min = int(self.time_mode_seconds // 60)
         lines = [
             f"## FUNDAMENTOS TEÓRICOS DE INFORMÁTICA - GRUPO N°2",
             f"Integrantes: Alexis Mariqueo, Cesar Millavanque, Daniel Enegron, Kadir Martinez (2026)",
-            f"• Alfabeto de Entrada: Σ = {{a, e, x}} (a: acierto, e: error, x: inválido)",
+            f"• Alfabeto de Entrada del Juego: Σ = {{a, e, x}} (a: acierto, e: error, x: inválido)",
             f"• AFD de Progreso: Quíntupla (Σ, Q, δ, q0, F). Estados {{q0..qN, q_sumidero}}.",
             f"  Avanza únicamente con el símbolo 'a'. Los errores y jugadas inválidas permanecen en el estado.",
             f"• AP de Control de Vidas: Estados {{q0, q1, q2}}, Alfabeto Pila {{Z, V}}.",
-            f"  Inicia con 5 vidas (VVVVVZ). Cada error 'e' desapila una 'V'. Al 5to error, se desapila 'Z'",
-            f"  y la pila queda totalmente vacía (Aceptación por Pila Vacía = Derrota).",
+            f"  Inicia con 5 vidas (VVVVVZ). Cada error 'e' desapila 'V'. Al 5to error, se desapila 'Z'",
+            f"  alcanzando q2 y dejando la pila vacía (Aceptación por Pila Vacía = Derrota por errores).",
+            f"• AP de Control de Tiempo: Estados {{q0, q1, q2}}, Alfabeto Pila {{Z, M}}, ΣE = {{t}}.",
+            f"  Inicia con {t_min} minutos ({'M'*t_min}Z). Cada minuto transcurrido ('t') desapila una 'M'.",
+            f"  Al llegar a 00:00 se desapila 'Z' alcanzando q2 con pila vacía (Derrota por tiempo agotado).",
             f"• Expresión Regular Ganadora (Fácil): (e+x)* a (e+x)* a (e+x)* a (e+x)* a",
         ]
 
         self.active_modal = ModalDialog(
-            width=700,
-            height=430,
+            width=720,
+            height=460,
             screen_size=(self.screen_width, self.screen_height),
             title="FUNDAMENTOS TEÓRICOS (AUTÓMATAS)",
             content_lines=lines,
@@ -709,8 +721,20 @@ class GameManager:
                 return  # No actualizar temporizador ni esperar errores durante la previsualización
             # 1. Temporizador de cuenta regresiva
             self.time_remaining -= dt
+
+            # Sincronización con el AP de Tiempo: transcurso de minutos (símbolo 't')
+            total_minutes = int(self.time_mode_seconds // 60)
+            elapsed_sec = max(0.0, self.time_mode_seconds - self.time_remaining)
+            minutes_now = min(int(elapsed_sec // 60), total_minutes)
+            while self.minutes_elapsed < minutes_now:
+                self.minutes_elapsed += 1
+                self.automata.step_time()
+
             if self.time_remaining <= 0.0:
                 self.time_remaining = 0.0
+                while self.minutes_elapsed < total_minutes:
+                    self.minutes_elapsed += 1
+                    self.automata.step_time()
                 self._handle_defeat_by_time()
                 return
 
@@ -831,13 +855,18 @@ class GameManager:
             self.automata.last_transition_dfa,
         )
 
-        # 6. Panel derecho: Visualizador de la Pila (AP)
+        # 6. Panel derecho: Visualizador de las Pilas (AP Vidas y AP Tiempo)
         self.stack_view.draw(
             surface,
-            self.automata.pda_stack,
-            self.automata.pda_state,
-            self.automata.lives,
-            self.automata.last_transition_pda,
+            lives_stack=self.automata.pda_stack,
+            lives_state=self.automata.pda_state,
+            lives=self.automata.lives,
+            lives_transition=self.automata.last_transition_pda,
+            time_stack=self.automata.time_pda_stack,
+            time_state=self.automata.time_pda_state,
+            minutes_left=self.automata.minutes_left,
+            total_minutes=int(self.time_mode_seconds // 60),
+            time_transition=self.automata.last_transition_time_pda,
         )
 
         # 7. Botones de acción
@@ -847,7 +876,7 @@ class GameManager:
         self.btn_theory.draw(surface)
 
         # 8. Barra de mensaje de estado
-        msg_panel = pygame.Rect(820, 620, 440, 45)
+        msg_panel = pygame.Rect(820, 612, 440, 44)
         draw_cozy_panel(surface, msg_panel, border_radius=8, bg_color=(46, 36, 44), border_color=(90, 70, 78), alpha=240)
 
         msg_font = get_font(12, bold=True)
