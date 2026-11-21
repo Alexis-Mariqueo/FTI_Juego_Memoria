@@ -73,10 +73,11 @@ def main():
         game_manager.draw(current_screen)
         pygame.display.flip()
 
-    # Guardar configuración de audio y pantalla al salir
+    # Guardar configuración de audio, pantalla y partida al salir
     try:
         game_manager.sound.save_config()
         game_manager._save_display_config()
+        game_manager._save_game_config()
     except Exception:
         pass
 

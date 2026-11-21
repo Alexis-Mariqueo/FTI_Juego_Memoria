@@ -55,6 +55,8 @@ class GameManager:
         self.difficulty = "facil"  # 'facil' (4 pares) o 'dificil' (8 pares)
         self.time_mode_seconds = 300.0  # 300s (5 min) o 600s (10 min)
         self.mostrar_cartas_al_inicio = False
+        self.game_config_path = "game_settings.json"
+        self._load_game_config()
 
         # Variables de partida
         self.score = 200
@@ -330,14 +332,36 @@ class GameManager:
         self._save_display_config()
         self.open_settings_hub()
 
+    def _load_game_config(self):
+        """Carga los ajustes de partida (previsualización de cartas) desde game_settings.json."""
+        if os.path.exists(self.game_config_path):
+            try:
+                with open(self.game_config_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self.mostrar_cartas_al_inicio = bool(data.get("mostrar_cartas_al_inicio", False))
+            except Exception as e:
+                print(f"Aviso: No se pudo leer {self.game_config_path}: {e}")
+        else:
+            self._save_game_config()
+
+    def _save_game_config(self):
+        """Guarda los ajustes de partida en game_settings.json."""
+        try:
+            with open(self.game_config_path, "w", encoding="utf-8") as f:
+                json.dump({"mostrar_cartas_al_inicio": self.mostrar_cartas_al_inicio}, f, indent=4)
+        except Exception as e:
+            print(f"Error guardando {self.game_config_path}: {e}")
+
     def set_card_preview(self, enabled: bool):
         self.mostrar_cartas_al_inicio = enabled
+        self._save_game_config()
 
     def quit_game(self):
         """Cierra la aplicación de forma limpia y asegura el guardado de configuraciones JSON."""
         try:
             self.sound.save_config()
             self._save_display_config()
+            self._save_game_config()
         except Exception:
             pass
         self.is_running = False
