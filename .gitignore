@@ -1,0 +1,22 @@
+# Configuraciones locales de cada integrante (Memotest)
+sound_settings.json
+display_settings.json
+game_settings.json
+
+# Entorno y bytecode de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Entornos virtuales
+.venv/
+env/
+venv/
+ENV/
+
+# Archivos de sistema y editores
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
