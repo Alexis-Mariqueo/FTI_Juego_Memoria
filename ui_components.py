@@ -1040,3 +1040,186 @@ class ScreenSettingsModal:
 
         # Botón Guardar y Salir
         self.btn_save_exit.draw(surface)
+
+
+class PlaySetupModal:
+    """Ventana interactiva para configurar Dificultad, Tiempo y Previsualización antes de jugar."""
+
+    def __init__(
+        self,
+        screen_size: Tuple[int, int],
+        initial_difficulty: str,
+        initial_time: float,
+        mostrar_cartas: bool,
+        on_change_difficulty: Callable[[str], None],
+        on_change_time: Callable[[float], None],
+        on_change_preview: Callable[[bool], None],
+        on_start_game: Callable[[], None],
+        on_close: Callable[[], None],
+    ):
+        self.screen_size = screen_size
+        self.difficulty = initial_difficulty
+        self.time_seconds = initial_time
+        self.mostrar_cartas = mostrar_cartas
+        self.on_change_difficulty = on_change_difficulty
+        self.on_change_time = on_change_time
+        self.on_change_preview = on_change_preview
+        self.on_start_game = on_start_game
+        self.on_close = on_close
+
+        width = 620
+        height = 510
+        self.rect = pygame.Rect(
+            (screen_size[0] - width) // 2,
+            (screen_size[1] - height) // 2,
+            width,
+            height,
+        )
+
+        self.title_font = get_font(23, bold=True)
+        self.section_font = get_font(15, bold=True)
+        self.desc_font = get_font(12, bold=False)
+
+        # 1. Selector de Dificultad
+        sel_w = 520
+        sel_x = self.rect.centerx - sel_w // 2
+        self.diff_selector = SegmentedSelector(
+            x=sel_x,
+            y=self.rect.y + 105,
+            width=sel_w,
+            height=44,
+            options=[
+                ("Fácil (8 cartas - 4 pares)", "facil"),
+                ("Difícil (16 cartas - 8 pares)", "dificil"),
+            ],
+            selected_value=self.difficulty,
+            on_change=self._on_diff_changed,
+        )
+
+        # 2. Selector de Tiempo
+        self.time_selector = SegmentedSelector(
+            x=sel_x,
+            y=self.rect.y + 195,
+            width=sel_w,
+            height=44,
+            options=[
+                ("Tiempo Corto (5 min)", "300"),
+                ("Tiempo Normal (10 min)", "600"),
+            ],
+            selected_value=str(int(self.time_seconds)),
+            on_change=self._on_time_changed,
+        )
+
+        # 3. Opción de previsualización de cartas al inicio
+        btn_prev_w = 170
+        btn_prev_h = 38
+        self.btn_preview = Button(
+            rect=pygame.Rect(self.rect.x + 390, self.rect.y + 275, btn_prev_w, btn_prev_h),
+            text="Activado" if self.mostrar_cartas else "Desactivado",
+            callback=self._toggle_preview,
+            bg_color=COZY_GREEN_SAGE if self.mostrar_cartas else COZY_TERRACOTTA,
+            hover_color=COZY_GREEN_HOVER if self.mostrar_cartas else COZY_TERRACOTTA_HOVER,
+            font_size=14,
+            border_radius=8,
+        )
+
+        # 4. Botones inferiores: Volver e Iniciar Partida
+        btn_bottom_w = 230
+        btn_bottom_h = 46
+        bottom_y = self.rect.bottom - 64
+
+        self.btn_back = Button(
+            rect=pygame.Rect(self.rect.x + 50, bottom_y, btn_bottom_w, btn_bottom_h),
+            text="Volver",
+            callback=self.on_close,
+            bg_color=COZY_TERRACOTTA,
+            hover_color=COZY_TERRACOTTA_HOVER,
+            font_size=16,
+            border_radius=10,
+        )
+
+        self.btn_start = Button(
+            rect=pygame.Rect(self.rect.right - 50 - btn_bottom_w, bottom_y, btn_bottom_w, btn_bottom_h),
+            text="INICIAR PARTIDA",
+            callback=self._on_start_clicked,
+            bg_color=COZY_GREEN_SAGE,
+            hover_color=COZY_GREEN_HOVER,
+            font_size=16,
+            border_radius=10,
+        )
+
+    def _on_diff_changed(self, val: str):
+        self.difficulty = val
+        self.on_change_difficulty(val)
+
+    def _on_time_changed(self, val: str):
+        self.time_seconds = float(val)
+        self.on_change_time(self.time_seconds)
+
+    def _toggle_preview(self):
+        self.mostrar_cartas = not self.mostrar_cartas
+        self.btn_preview.text = "Activado" if self.mostrar_cartas else "Desactivado"
+        self.btn_preview.bg_color = COZY_GREEN_SAGE if self.mostrar_cartas else COZY_TERRACOTTA
+        self.btn_preview.hover_color = COZY_GREEN_HOVER if self.mostrar_cartas else COZY_TERRACOTTA_HOVER
+        self.on_change_preview(self.mostrar_cartas)
+
+    def _on_start_clicked(self):
+        self.on_start_game()
+
+    def handle_event(self, event: pygame.event.Event) -> bool:
+        if self.diff_selector.handle_event(event):
+            return True
+        if self.time_selector.handle_event(event):
+            return True
+        if self.btn_preview.handle_event(event):
+            return True
+        if self.btn_back.handle_event(event):
+            return True
+        if self.btn_start.handle_event(event):
+            return True
+        return False
+
+    def draw(self, surface: pygame.Surface):
+        # Capa ambiental cálida de fondo
+        overlay = pygame.Surface(self.screen_size, pygame.SRCALPHA)
+        overlay.fill((30, 20, 26, 205))
+        surface.blit(overlay, (0, 0))
+
+        # Panel contenedor
+        draw_cozy_panel(surface, self.rect, border_radius=16, bg_color=(48, 36, 44), border_color=(105, 82, 92), alpha=245)
+
+        # Título
+        title_surf = self.title_font.render("PREPARAR PARTIDA", True, COZY_TEXT_GOLD)
+        surface.blit(title_surf, title_surf.get_rect(center=(self.rect.centerx, self.rect.y + 34)))
+
+        # Separador decorativo
+        sep_y = self.rect.y + 58
+        pygame.draw.line(surface, (88, 68, 76), (self.rect.x + 30, sep_y), (self.rect.right - 30, sep_y), 2)
+
+        # 1. Sección Dificultad
+        lbl_diff = self.section_font.render("1. Dificultad del Tablero:", True, COZY_TEXT_MAIN)
+        surface.blit(lbl_diff, (self.rect.x + 50, self.rect.y + 78))
+        self.diff_selector.draw(surface)
+
+        # 2. Sección Tiempo
+        lbl_time = self.section_font.render("2. Modo de Tiempo:", True, COZY_TEXT_MAIN)
+        surface.blit(lbl_time, (self.rect.x + 50, self.rect.y + 168))
+        self.time_selector.draw(surface)
+
+        # 3. Sección Previsualización
+        lbl_prev = self.section_font.render("3. Mostrar cartas al inicio:", True, COZY_TEXT_MAIN)
+        surface.blit(lbl_prev, (self.rect.x + 50, self.rect.y + 282))
+        self.btn_preview.draw(surface)
+
+        sub_desc = self.desc_font.render(
+            "(Descubre las cartas durante 3 segundos al iniciar)", True, COZY_TEXT_MUTED
+        )
+        surface.blit(sub_desc, (self.rect.x + 50, self.rect.y + 316))
+
+        # Separador inferior
+        sep2_y = self.rect.bottom - 82
+        pygame.draw.line(surface, (78, 58, 66), (self.rect.x + 40, sep2_y), (self.rect.right - 40, sep2_y), 1)
+
+        # Botones inferiores: Volver e Iniciar Partida
+        self.btn_back.draw(surface)
+        self.btn_start.draw(surface)

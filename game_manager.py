@@ -18,6 +18,7 @@ from ui_components import (
     DFAGraphVisualizer,
     GameSettingsModal,
     ModalDialog,
+    PlaySetupModal,
     ScreenSettingsModal,
     SegmentedSelector,
     SettingsHubModal,
@@ -191,48 +192,20 @@ class GameManager:
         """Inicializa los elementos interactivos del menú principal."""
         center_x = self.screen_width // 2
 
-        # Selector de dificultad
-        self.diff_selector = SegmentedSelector(
-            x=center_x - 220,
-            y=276,
-            width=440,
-            height=44,
-            options=[
-                ("Fácil (8 cartas - 4 pares)", "facil"),
-                ("Difícil (16 cartas - 8 pares)", "dificil"),
-            ],
-            selected_value=self.difficulty,
-            on_change=lambda val: setattr(self, "difficulty", val),
-        )
-
-        # Selector de tiempo
-        self.time_selector = SegmentedSelector(
-            x=center_x - 220,
-            y=356,
-            width=440,
-            height=44,
-            options=[
-                ("Tiempo Corto (5 min)", "300"),
-                ("Tiempo Normal (10 min)", "600"),
-            ],
-            selected_value=str(int(self.time_mode_seconds)),
-            on_change=lambda val: setattr(self, "time_mode_seconds", float(val)),
-        )
-
-        # Fila 1: Botón para Iniciar Partida
+        # Fila 1: Botón para Jugar (abre la pantalla de preparación de partida)
         self.btn_start = Button(
-            rect=pygame.Rect(center_x - 220, 424, 440, 48),
-            text="INICIAR PARTIDA",
-            callback=self.start_game,
+            rect=pygame.Rect(center_x - 220, 294, 440, 52),
+            text="JUGAR",
+            callback=self.open_play_modal,
             bg_color=COZY_GREEN_SAGE,
             hover_color=COZY_GREEN_HOVER,
-            font_size=18,
+            font_size=20,
             border_radius=10,
         )
 
-        # Fila 2: Botón de Ajustes (Sonido y Pantalla) y Botón de Fundamentos Teóricos
+        # Fila 2: Botón de Ajustes (Sonido, Pantalla, Partida) y Botón de Fundamentos Teóricos
         self.btn_sound = Button(
-            rect=pygame.Rect(center_x - 220, 484, 215, 42),
+            rect=pygame.Rect(center_x - 220, 360, 215, 44),
             text="Ajustes",
             callback=self.open_settings_hub,
             bg_color=COZY_AMBER,
@@ -242,7 +215,7 @@ class GameManager:
         )
 
         self.btn_menu_theory = Button(
-            rect=pygame.Rect(center_x + 5, 484, 215, 42),
+            rect=pygame.Rect(center_x + 5, 360, 215, 44),
             text="Fundamentos Teóricos",
             callback=self.show_theoretical_info,
             bg_color=COZY_SLATE_PURPLE,
@@ -253,7 +226,7 @@ class GameManager:
 
         # Fila 3: Botón para Salir del Juego
         self.btn_quit = Button(
-            rect=pygame.Rect(center_x - 220, 538, 440, 38),
+            rect=pygame.Rect(center_x - 220, 418, 440, 42),
             text="Salir del Juego",
             callback=self.quit_game,
             bg_color=COZY_TERRACOTTA,
@@ -288,6 +261,20 @@ class GameManager:
         if self.is_fullscreen:
             flags |= pygame.FULLSCREEN
         pygame.display.set_mode((self.screen_width, self.screen_height), flags)
+
+    def open_play_modal(self):
+        """Abre la pantalla de configuración previa al juego (dificultad, tiempo, previsualización)."""
+        self.active_modal = PlaySetupModal(
+            screen_size=(self.screen_width, self.screen_height),
+            initial_difficulty=self.difficulty,
+            initial_time=self.time_mode_seconds,
+            mostrar_cartas=self.mostrar_cartas_al_inicio,
+            on_change_difficulty=lambda d: setattr(self, "difficulty", d),
+            on_change_time=lambda t: setattr(self, "time_mode_seconds", t),
+            on_change_preview=self.set_card_preview,
+            on_start_game=self.start_game,
+            on_close=lambda: setattr(self, "active_modal", None),
+        )
 
     def open_settings_hub(self):
         """Abre el menú principal de Ajustes (con botones para Ajuste de Sonido, Ajuste de Pantalla y Ajuste de Partida)."""
@@ -473,8 +460,6 @@ class GameManager:
             return
 
         if self.state == STATE_MENU:
-            self.diff_selector.handle_event(event)
-            self.time_selector.handle_event(event)
             self.btn_start.handle_event(event)
             self.btn_sound.handle_event(event)
             self.btn_menu_theory.handle_event(event)
@@ -767,7 +752,7 @@ class GameManager:
         center_x = self.screen_width // 2
 
         # Panel contenedor central del menú estilo tarjeta cálida selective outline
-        menu_box = pygame.Rect(center_x - 320, 35, 640, 650)
+        menu_box = pygame.Rect(center_x - 320, 80, 640, 425)
         draw_cozy_panel(surface, menu_box, border_radius=16, bg_color=(44, 34, 42), border_color=(92, 72, 80), alpha=235)
 
         # Cabecera Institucional
@@ -777,12 +762,12 @@ class GameManager:
             True,
             (215, 195, 185),
         )
-        surface.blit(sub_surf, sub_surf.get_rect(center=(center_x, 62)))
+        surface.blit(sub_surf, sub_surf.get_rect(center=(center_x, 106)))
 
         # Título Principal
         font_title = get_font(35, bold=True)
         title_surf = font_title.render("JUEGO DE LA MEMORIA (MEMOTEST)", True, COZY_TEXT_GOLD)
-        surface.blit(title_surf, title_surf.get_rect(center=(center_x, 104)))
+        surface.blit(title_surf, title_surf.get_rect(center=(center_x, 145)))
 
         # Subtítulo de Autómatas
         font_model = get_font(14, bold=True)
@@ -791,27 +776,18 @@ class GameManager:
             True,
             (245, 195, 165),
         )
-        surface.blit(model_surf, model_surf.get_rect(center=(center_x, 140)))
+        surface.blit(model_surf, model_surf.get_rect(center=(center_x, 180)))
 
         # Cuadro de Integrantes (Grupo N°2)
-        group_rect = pygame.Rect(center_x - 280, 168, 560, 68)
+        group_rect = pygame.Rect(center_x - 280, 204, 560, 64)
         draw_cozy_panel(surface, group_rect, border_radius=10, bg_color=(52, 40, 48), border_color=(98, 76, 86), alpha=240)
 
         g_title = get_font(13, bold=True).render("GRUPO N°2 (2026):", True, COZY_TEXT_GOLD)
-        surface.blit(g_title, g_title.get_rect(center=(center_x, 186)))
+        surface.blit(g_title, g_title.get_rect(center=(center_x, 220)))
 
         members = "Alexis Mariqueo  •  Cesar Millavanque  •  Daniel Enegron  •  Kadir Martinez"
         m_surf = get_font(14, bold=False).render(members, True, (244, 235, 226))
-        surface.blit(m_surf, m_surf.get_rect(center=(center_x, 212)))
-
-        # Etiquetas de selectores
-        lbl_diff = get_font(14, bold=True).render("Selecciona la Dificultad del Tablero:", True, (250, 240, 230))
-        surface.blit(lbl_diff, (center_x - 220, 252))
-        self.diff_selector.draw(surface)
-
-        lbl_time = get_font(14, bold=True).render("Selecciona el Modo de Tiempo:", True, (250, 240, 230))
-        surface.blit(lbl_time, (center_x - 220, 332))
-        self.time_selector.draw(surface)
+        surface.blit(m_surf, m_surf.get_rect(center=(center_x, 246)))
 
         # Botones de inicio, sonido, teoría y salir
         self.btn_start.draw(surface)
