@@ -528,13 +528,13 @@ class ModalDialog:
 class SoundSettingsModal:
     """Ventana interactiva de Ajustes de Audio: volumen, mute de música y efectos con guardado JSON."""
 
-    def __init__(self, screen_size: Tuple[int, int], sound_manager, on_close: Callable, mostrar_cartas: bool, on_preview_change: Callable[[bool], None]):
+    def __init__(self, screen_size: Tuple[int, int], sound_manager, on_close: Callable):
         self.screen_size = screen_size
         self.sound = sound_manager
         self.on_close = on_close
 
         width = 640
-        height = 430
+        height = 350
         self.rect = pygame.Rect(
             (screen_size[0] - width) // 2,
             (screen_size[1] - height) // 2,
@@ -546,8 +546,6 @@ class SoundSettingsModal:
         self.section_font = get_font(16, bold=True)
         self.label_font = get_font(14, bold=False)
         self.val_font = get_font(15, bold=True)
-        self.mostrar_cartas = mostrar_cartas
-        self.on_preview_change = on_preview_change
 
         self._build_controls()
 
@@ -556,7 +554,7 @@ class SoundSettingsModal:
         self.buttons: List[Button] = []
 
         # 1. Controles de Música
-        row1_y = self.rect.y + 118
+        row1_y = self.rect.y + 115
         self.btn_mus_down = Button(
             rect=pygame.Rect(self.rect.x + 40, row1_y, 45, 34),
             text=" - ",
@@ -588,7 +586,7 @@ class SoundSettingsModal:
         self.buttons.append(self.btn_mus_mute)
 
         # 2. Controles de Efectos (SFX)
-        row2_y = self.rect.y + 215
+        row2_y = self.rect.y + 205
         self.btn_sfx_down = Button(
             rect=pygame.Rect(self.rect.x + 40, row2_y, 45, 34),
             text=" - ",
@@ -619,22 +617,10 @@ class SoundSettingsModal:
         )
         self.buttons.append(self.btn_sfx_mute)
 
-        # 3. Opción de previsualización de cartas
-        row3_y = self.rect.y + 285
-        self.btn_card_preview = Button(
-            rect=pygame.Rect(self.rect.x + 360, row3_y, 220, 34),
-            text="Activado" if self.mostrar_cartas else "Desactivado",
-            callback=self._toggle_card_preview,
-            bg_color=COZY_GREEN_SAGE if self.mostrar_cartas else COZY_TERRACOTTA,
-            hover_color=COZY_GREEN_HOVER if self.mostrar_cartas else COZY_TERRACOTTA_HOVER,
-            font_size=14,
-        )
-        self.buttons.append(self.btn_card_preview)
-
-        # 4. Fila inferior: Guardar y Salir
-        row4_y = self.rect.bottom - 56
+        # 3. Fila inferior: Guardar y Salir
+        row3_y = self.rect.bottom - 54
         self.btn_close = Button(
-            rect=pygame.Rect(self.rect.centerx - 110, row4_y, 220, 40),
+            rect=pygame.Rect(self.rect.centerx - 110, row3_y, 220, 40),
             text="Guardar y Salir",
             callback=self._save_and_close,
             bg_color=COZY_GREEN_SAGE,
@@ -653,11 +639,6 @@ class SoundSettingsModal:
 
     def _toggle_sfx_mute(self):
         self.sound.toggle_sfx_mute()
-
-    def _toggle_card_preview(self):
-        self.mostrar_cartas = not self.mostrar_cartas
-        self.btn_card_preview.text = "Activado" if self.mostrar_cartas else "Desactivado"
-        self.on_preview_change(self.mostrar_cartas)
 
     def handle_event(self, event: pygame.event.Event) -> bool:
         for btn in self.buttons:
@@ -695,7 +676,7 @@ class SoundSettingsModal:
         surface.blit(vol_mus_surf, (self.rect.x + 360, sec1_y + 2))
 
         # Barra visual de volumen música
-        bar1_rect = pygame.Rect(self.rect.x + 95, self.rect.y + 124, 180, 22)
+        bar1_rect = pygame.Rect(self.rect.x + 95, self.rect.y + 121, 180, 22)
         pygame.draw.rect(surface, (36, 26, 32), bar1_rect, border_radius=6)
         pygame.draw.rect(surface, (84, 65, 74), bar1_rect, width=1, border_radius=6)
 
@@ -710,7 +691,7 @@ class SoundSettingsModal:
         self.btn_mus_mute.hover_color = COZY_GREEN_HOVER if self.sound.music_muted else COZY_TERRACOTTA_HOVER
 
         # ----------------- SECCIÓN 2: EFECTOS DE SONIDO -----------------
-        sec2_y = self.rect.y + 175
+        sec2_y = self.rect.y + 168
         sec2_surf = self.section_font.render("Efectos de Sonido (Acierto, Fallo, Cartas)", True, COZY_TEXT_MAIN)
         surface.blit(sec2_surf, (self.rect.x + 40, sec2_y))
 
@@ -721,7 +702,7 @@ class SoundSettingsModal:
         surface.blit(vol_sfx_surf, (self.rect.x + 360, sec2_y + 2))
 
         # Barra visual de volumen efectos
-        bar2_rect = pygame.Rect(self.rect.x + 95, self.rect.y + 221, 180, 22)
+        bar2_rect = pygame.Rect(self.rect.x + 95, self.rect.y + 211, 180, 22)
         pygame.draw.rect(surface, (36, 26, 32), bar2_rect, border_radius=6)
         pygame.draw.rect(surface, (84, 65, 74), bar2_rect, width=1, border_radius=6)
 
@@ -735,41 +716,30 @@ class SoundSettingsModal:
         self.btn_sfx_mute.bg_color = COZY_GREEN_SAGE if self.sound.sfx_muted else COZY_TERRACOTTA
         self.btn_sfx_mute.hover_color = COZY_GREEN_HOVER if self.sound.sfx_muted else COZY_TERRACOTTA_HOVER
 
-        # ----------------- SECCIÓN 3: PREVISUALIZACIÓN DE CARTAS -----------------
-        preview_label = self.section_font.render(
-            "Mostrar cartas al inicio", True, COZY_TEXT_MAIN
-        )
-        surface.blit(preview_label, (self.rect.x + 40, self.rect.y + 292))
-
-        if self.mostrar_cartas:
-            self.btn_card_preview.bg_color = COZY_GREEN_SAGE
-            self.btn_card_preview.hover_color = COZY_GREEN_HOVER
-        else:
-            self.btn_card_preview.bg_color = COZY_TERRACOTTA
-            self.btn_card_preview.hover_color = COZY_TERRACOTTA_HOVER
-
         # Dibujar todos los botones
         for btn in self.buttons:
             btn.draw(surface)
 
 
 class SettingsHubModal:
-    """Ventana central de Ajustes con accesos a Ajuste de Sonido y Ajuste de Pantalla."""
+    """Ventana central de Ajustes con accesos a Ajuste de Sonido, Ajuste de Pantalla y Ajuste de Partida."""
 
     def __init__(
         self,
         screen_size: Tuple[int, int],
         on_open_sound: Callable[[], None],
         on_open_screen: Callable[[], None],
+        on_open_game: Callable[[], None],
         on_close: Callable[[], None],
     ):
         self.screen_size = screen_size
         self.on_open_sound = on_open_sound
         self.on_open_screen = on_open_screen
+        self.on_open_game = on_open_game
         self.on_close = on_close
 
-        width = 460
-        height = 360
+        width = 480
+        height = 410
         self.rect = pygame.Rect(
             (screen_size[0] - width) // 2,
             (screen_size[1] - height) // 2,
@@ -781,12 +751,12 @@ class SettingsHubModal:
         self.desc_font = get_font(14, bold=False)
 
         btn_w = 320
-        btn_h = 46
+        btn_h = 44
         cx = self.rect.centerx - btn_w // 2
 
         self.buttons: List[Button] = [
             Button(
-                rect=pygame.Rect(cx, self.rect.y + 110, btn_w, btn_h),
+                rect=pygame.Rect(cx, self.rect.y + 105, btn_w, btn_h),
                 text="Ajuste de Sonido",
                 callback=self.on_open_sound,
                 bg_color=COZY_AMBER,
@@ -795,7 +765,7 @@ class SettingsHubModal:
                 border_radius=10,
             ),
             Button(
-                rect=pygame.Rect(cx, self.rect.y + 175, btn_w, btn_h),
+                rect=pygame.Rect(cx, self.rect.y + 162, btn_w, btn_h),
                 text="Ajuste de Pantalla",
                 callback=self.on_open_screen,
                 bg_color=COZY_SLATE_PURPLE,
@@ -804,7 +774,16 @@ class SettingsHubModal:
                 border_radius=10,
             ),
             Button(
-                rect=pygame.Rect(cx, self.rect.y + 265, btn_w, 42),
+                rect=pygame.Rect(cx, self.rect.y + 219, btn_w, btn_h),
+                text="Ajuste de Partida",
+                callback=self.on_open_game,
+                bg_color=COZY_GREEN_SAGE,
+                hover_color=COZY_GREEN_HOVER,
+                font_size=16,
+                border_radius=10,
+            ),
+            Button(
+                rect=pygame.Rect(cx, self.rect.y + 300, btn_w, 40),
                 text="Volver",
                 callback=self.on_close,
                 bg_color=COZY_TERRACOTTA,
@@ -831,19 +810,126 @@ class SettingsHubModal:
 
         # Título
         title_surf = self.title_font.render("AJUSTES", True, COZY_TEXT_GOLD)
-        surface.blit(title_surf, title_surf.get_rect(center=(self.rect.centerx, self.rect.y + 36)))
+        surface.blit(title_surf, title_surf.get_rect(center=(self.rect.centerx, self.rect.y + 34)))
 
         # Separador decorativo
-        sep_y = self.rect.y + 64
+        sep_y = self.rect.y + 60
         pygame.draw.line(surface, (88, 68, 76), (self.rect.x + 30, sep_y), (self.rect.right - 30, sep_y), 2)
 
         # Descripción
         desc_surf = self.desc_font.render("Selecciona la categoría que deseas configurar:", True, COZY_TEXT_MUTED)
-        surface.blit(desc_surf, desc_surf.get_rect(center=(self.rect.centerx, self.rect.y + 86)))
+        surface.blit(desc_surf, desc_surf.get_rect(center=(self.rect.centerx, self.rect.y + 82)))
 
         # Botones
         for btn in self.buttons:
             btn.draw(surface)
+
+
+class GameSettingsModal:
+    """Ventana interactiva de Ajuste de Partida: opción de mostrar cartas al inicio."""
+
+    def __init__(
+        self,
+        screen_size: Tuple[int, int],
+        mostrar_cartas: bool,
+        on_change_preview: Callable[[bool], None],
+        on_close: Callable[[], None],
+    ):
+        self.screen_size = screen_size
+        self.mostrar_cartas = mostrar_cartas
+        self.on_change_preview = on_change_preview
+        self.on_close = on_close
+
+        width = 580
+        height = 370
+        self.rect = pygame.Rect(
+            (screen_size[0] - width) // 2,
+            (screen_size[1] - height) // 2,
+            width,
+            height,
+        )
+
+        self.title_font = get_font(22, bold=True)
+        self.section_font = get_font(16, bold=True)
+        self.info_font = get_font(13, bold=False)
+
+        # Botón selector de activación
+        self.btn_toggle = Button(
+            rect=pygame.Rect(self.rect.x + 360, self.rect.y + 110, 180, 40),
+            text="Activado" if self.mostrar_cartas else "Desactivado",
+            callback=self._toggle_preview,
+            bg_color=COZY_GREEN_SAGE if self.mostrar_cartas else COZY_TERRACOTTA,
+            hover_color=COZY_GREEN_HOVER if self.mostrar_cartas else COZY_TERRACOTTA_HOVER,
+            font_size=15,
+            border_radius=8,
+        )
+
+        # Botón de Volver a la pantalla de ajustes
+        btn_w = 220
+        btn_h = 42
+        self.btn_back = Button(
+            rect=pygame.Rect(self.rect.centerx - btn_w // 2, self.rect.bottom - 58, btn_w, btn_h),
+            text="Volver",
+            callback=self.on_close,
+            bg_color=COZY_TERRACOTTA,
+            hover_color=COZY_TERRACOTTA_HOVER,
+            font_size=15,
+            border_radius=8,
+        )
+
+    def _toggle_preview(self):
+        self.mostrar_cartas = not self.mostrar_cartas
+        self.btn_toggle.text = "Activado" if self.mostrar_cartas else "Desactivado"
+        self.btn_toggle.bg_color = COZY_GREEN_SAGE if self.mostrar_cartas else COZY_TERRACOTTA
+        self.btn_toggle.hover_color = COZY_GREEN_HOVER if self.mostrar_cartas else COZY_TERRACOTTA_HOVER
+        self.on_change_preview(self.mostrar_cartas)
+
+    def handle_event(self, event: pygame.event.Event) -> bool:
+        if self.btn_toggle.handle_event(event):
+            return True
+        if self.btn_back.handle_event(event):
+            return True
+        return False
+
+    def draw(self, surface: pygame.Surface):
+        # Capa ambiental cálida de fondo
+        overlay = pygame.Surface(self.screen_size, pygame.SRCALPHA)
+        overlay.fill((30, 20, 26, 205))
+        surface.blit(overlay, (0, 0))
+
+        # Ventana del modal
+        draw_cozy_panel(surface, self.rect, border_radius=14, bg_color=(48, 36, 44), border_color=(105, 82, 92), alpha=245)
+
+        # Título
+        title_surf = self.title_font.render("AJUSTE DE PARTIDA", True, COZY_TEXT_GOLD)
+        surface.blit(title_surf, title_surf.get_rect(center=(self.rect.centerx, self.rect.y + 34)))
+
+        # Separador decorativo
+        sep_y = self.rect.y + 60
+        pygame.draw.line(surface, (88, 68, 76), (self.rect.x + 30, sep_y), (self.rect.right - 30, sep_y), 2)
+
+        # Etiqueta de la opción
+        sec_surf = self.section_font.render("Mostrar cartas al inicio", True, COZY_TEXT_MAIN)
+        surface.blit(sec_surf, (self.rect.x + 40, self.rect.y + 118))
+
+        # Dibujar botón de activación
+        self.btn_toggle.draw(surface)
+
+        # Explicación
+        info_lines = [
+            "• Al estar activado, todas las cartas del tablero se revelan",
+            "  durante 3 segundos al inicio de la partida para memorizarlas.",
+            "• Al estar desactivado, las cartas inician cubiertas directamente.",
+        ]
+        cur_y = self.rect.y + 175
+        for line in info_lines:
+            txt_col = (250, 226, 182) if "3 segundos" in line else (210, 195, 185)
+            line_surf = self.info_font.render(line, True, txt_col)
+            surface.blit(line_surf, (self.rect.x + 40, cur_y))
+            cur_y += 24
+
+        # Botón Volver
+        self.btn_back.draw(surface)
 
 
 class ScreenSettingsModal:

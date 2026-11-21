@@ -16,6 +16,7 @@ from sound_effects import SoundManager
 from ui_components import (
     Button,
     DFAGraphVisualizer,
+    GameSettingsModal,
     ModalDialog,
     ScreenSettingsModal,
     SegmentedSelector,
@@ -287,11 +288,12 @@ class GameManager:
         pygame.display.set_mode((self.screen_width, self.screen_height), flags)
 
     def open_settings_hub(self):
-        """Abre el menú principal de Ajustes (con botones para Ajuste de Sonido y Ajuste de Pantalla)."""
+        """Abre el menú principal de Ajustes (con botones para Ajuste de Sonido, Ajuste de Pantalla y Ajuste de Partida)."""
         self.active_modal = SettingsHubModal(
             screen_size=(self.screen_width, self.screen_height),
             on_open_sound=self.open_sound_settings,
             on_open_screen=self.open_screen_settings,
+            on_open_game=self.open_game_settings,
             on_close=lambda: setattr(self, "active_modal", None),
         )
 
@@ -301,8 +303,15 @@ class GameManager:
             screen_size=(self.screen_width, self.screen_height),
             sound_manager=self.sound,
             on_close=self.open_settings_hub,
+        )
+
+    def open_game_settings(self):
+        """Abre la ventana modal de ajustes de partida (opción de mostrar cartas al inicio)."""
+        self.active_modal = GameSettingsModal(
+            screen_size=(self.screen_width, self.screen_height),
             mostrar_cartas=self.mostrar_cartas_al_inicio,
-            on_preview_change=self.set_card_preview,
+            on_change_preview=self.set_card_preview,
+            on_close=self.open_settings_hub,
         )
 
     def open_screen_settings(self):
