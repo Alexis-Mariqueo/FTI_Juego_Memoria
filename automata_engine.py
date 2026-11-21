@@ -8,6 +8,12 @@ Este módulo define formalmente:
 2. Autómata de Pila Determinista (AP / DPDA) para el control de errores y vidas.
 """
 
+import sys
+# Desactivar módulos visuales opcionales de automata-lib para evitar dependencias C no usadas en el juego
+for _bad_mod in ("manim", "manimpango", "matplotlib", "scipy", "sympy", "pygraphviz", "coloraide"):
+    if _bad_mod not in sys.modules:
+        sys.modules[_bad_mod] = None
+
 from typing import Dict, List, Optional, Set, Tuple
 from automata.fa.dfa import DFA
 from automata.pda.dpda import DPDA

@@ -7,8 +7,27 @@ Integrantes: Alexis Mariqueo, Cesar Millavanque, Daniel Enegron, Kadir Martinez
 import json
 import os
 import sys
+import traceback
 import pygame
 from game_manager import GameManager
+
+
+def log_uncaught_exception(exc_type, exc_value, exc_traceback):
+    """Registra cualquier excepción no controlada en crash_log.txt."""
+    try:
+        with open("crash_log.txt", "w", encoding="utf-8") as f:
+            traceback.print_exception(exc_type, exc_value, exc_traceback, file=f)
+    except Exception:
+        pass
+    sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
+sys.excepthook = log_uncaught_exception
+
+
+def resource_path(relative_path: str) -> str:
+    """Obtiene la ruta a un recurso, compatible con desarrollo y ejecutables de PyInstaller."""
+    base_path = getattr(sys, "_MEIPASS", os.path.abspath("."))
+    return os.path.join(base_path, relative_path)
 
 
 def main():
@@ -36,8 +55,10 @@ def main():
 
     # Intentar cargar ícono de la ventana desde los assets si está disponible
     try:
-        icon = pygame.image.load("assets/cartas/Carta python.png")
-        pygame.display.set_icon(icon)
+        icon_path = resource_path(os.path.join("assets", "cartas", "Carta python.png"))
+        if os.path.exists(icon_path):
+            icon = pygame.image.load(icon_path)
+            pygame.display.set_icon(icon)
     except Exception:
         pass
 

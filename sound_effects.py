@@ -10,6 +10,7 @@ import json
 import math
 import os
 import struct
+import sys
 import wave
 from typing import Dict, Optional
 import pygame
@@ -18,11 +19,17 @@ import pygame
 CONFIG_FILE = "sound_settings.json"
 
 
+def resource_path(relative_path: str) -> str:
+    """Obtiene la ruta a un recurso, compatible con desarrollo y ejecutables de PyInstaller."""
+    base_path = getattr(sys, "_MEIPASS", os.path.abspath("."))
+    return os.path.join(base_path, relative_path)
+
+
 def find_audio_file(filename: str) -> Optional[str]:
     """Busca un archivo de audio tanto en assets/musica como directamente en assets."""
     candidates = [
-        os.path.join("assets", "musica", filename),
-        os.path.join("assets", filename),
+        resource_path(os.path.join("assets", "musica", filename)),
+        resource_path(os.path.join("assets", filename)),
     ]
     for c in candidates:
         if os.path.exists(c):

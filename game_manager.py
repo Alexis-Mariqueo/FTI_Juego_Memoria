@@ -7,8 +7,15 @@ reproducción de sonidos y sincronización con el controlador de autómatas.
 import json
 import os
 import random
+import sys
 import pygame
 from typing import Dict, List, Optional, Tuple
+
+
+def resource_path(relative_path: str) -> str:
+    """Obtiene la ruta a un recurso, compatible con desarrollo y ejecutables de PyInstaller."""
+    base_path = getattr(sys, "_MEIPASS", os.path.abspath("."))
+    return os.path.join(base_path, relative_path)
 
 from automata_engine import AutomataGameController
 from card import Card, STATE_FACE_DOWN, STATE_FACE_UP, STATE_MATCHED
@@ -150,8 +157,8 @@ class GameManager:
 
     def _load_backgrounds(self):
         """Carga y adapta los fondos en pixel art para el menú y el juego."""
-        menu_path = os.path.join("assets", "backgrounds", "menu_bg.png")
-        game_path = os.path.join("assets", "backgrounds", "game_bg.png")
+        menu_path = resource_path(os.path.join("assets", "backgrounds", "menu_bg.png"))
+        game_path = resource_path(os.path.join("assets", "backgrounds", "game_bg.png"))
 
         try:
             if os.path.exists(menu_path):
@@ -171,7 +178,7 @@ class GameManager:
 
     def _load_card_assets(self):
         """Carga las imágenes de las cartas desde la carpeta assets/cartas."""
-        assets_dir = os.path.join("assets", "cartas")
+        assets_dir = resource_path(os.path.join("assets", "cartas"))
         if not os.path.exists(assets_dir):
             raise FileNotFoundError(f"No se encontró el directorio de cartas: {assets_dir}")
 

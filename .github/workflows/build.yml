@@ -1,0 +1,65 @@
+name: Generar Ejecutables (Windows & Linux)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Compilar para Windows (.exe)
+    runs-on: windows-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pygame-ce automata-lib numpy pillow
+
+      - name: Compilar con PyInstaller
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name "Memotest_FTI" --add-data "assets;assets" --collect-all automata main.py
+
+      - name: Subir artefacto Windows (.exe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Memotest_FTI_Windows_exe
+          path: dist/Memotest_FTI.exe
+
+  build-linux:
+    name: Compilar para Linux (Binario ELF)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias del sistema y Python
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
+          python -m pip install --upgrade pip
+          pip install pyinstaller pygame-ce automata-lib numpy pillow
+
+      - name: Compilar con PyInstaller en Linux
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name "Memotest_FTI_linux" --add-data "assets:assets" --collect-all automata main.py
+
+      - name: Subir artefacto Linux
+        uses: actions/upload-artifact@v4
+        with:
+          name: Memotest_FTI_Linux_bin
+          path: dist/Memotest_FTI_linux
